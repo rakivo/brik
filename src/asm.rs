@@ -28,11 +28,25 @@ use crate::object::write::{
 
 use std::ops::{Deref, DerefMut};
 
+#[derive(Copy, Clone)]
+pub struct Label {
+    sym: SymbolId,
+}
+
+#[derive(Debug, Clone)]
+struct Reloc {
+    offset: u64,
+    sym: SymbolId,
+    type_: RiscvReloc,
+    addend: i64,
+}
+
 /// Object file builder
 #[derive(Debug)]
 pub struct Assembler<'a> {
     obj: Object<'a>,
     label_counter: u32,
+    relocs: Vec<(SectionId, Reloc)>,
     curr_section: Option<SectionId>,
 }
 
@@ -60,6 +74,7 @@ impl<'a> Assembler<'a> {
         isa: &str
     ) -> Self {
         let mut asm = Self {
+            relocs: Vec::new(),
             obj: Object::new(format, arch, endian),
             label_counter: 0,
             curr_section: None,
@@ -105,7 +120,33 @@ impl<'a> Assembler<'a> {
 
     #[must_use]
     #[inline(always)]
-    pub fn finish(self) -> Object<'a> { self.obj }
+    pub fn finish(mut self) -> Object<'a> {
+        self.resolve_local_relocs();
+        self.resolve_final_relocs();
+        self.obj
+    }
+
+    #[inline]
+    pub fn new_label(&mut self, name: &[u8]) -> Label {
+        let section_id = self.expect_curr_section();
+        let offset = self.obj.section(section_id).data().len() as u64;
+        let sym_name = if name.is_empty() {
+            self.label_counter += 1;
+            format!(".L{}", self.label_counter).into_bytes()
+        } else {
+            name.to_vec()
+        };
+
+        let sym = self.add_symbol(
+            &sym_name,
+            offset,
+            0,
+            SymbolKind::Text,
+            SymbolScope::Compilation
+        );
+
+        Label { sym }
+    }
 
     #[inline]
     pub fn add_section_at_end(
@@ -120,8 +161,7 @@ impl<'a> Assembler<'a> {
             kind,
         );
 
-        self.curr_section = Some(section);
-
+        self.position_at_end(section);
         section
     }
 
@@ -131,6 +171,7 @@ impl<'a> Assembler<'a> {
         &mut self,
         offset: u64,
         section: SectionId,
+        addend: i64,
         (symbol, rtype): (SymbolId, RiscvReloc),
     ) {
         self.obj.add_relocation(
@@ -138,10 +179,126 @@ impl<'a> Assembler<'a> {
             Relocation {
                 offset,
                 symbol,
-                addend: 0,
+                addend,
                 flags: RelocationFlags::Elf { r_type: rtype.code() },
             },
         ).expect("failed to add relocation")
+    }
+
+    #[inline]
+    pub fn resolve_final_relocs(&mut self) {
+        for (section_id, reloc) in self.relocs.clone() {
+            self.add_reloc(
+                reloc.offset,
+                section_id,
+                reloc.addend,
+                (reloc.sym, reloc.type_)
+            );
+        }
+    }
+
+    pub fn resolve_local_relocs(&mut self) {
+        fn apply_reloc(data: &mut [u8], type_: RiscvReloc, delta: i64) {
+            match type_ {
+                RiscvReloc::Branch => {
+                    if !(-4096..=4094).contains(&delta) || delta % 2 != 0 {
+                        panic!("Branch offset out of range: {}", delta);
+                    }
+                    let imm12 = (delta / 2) as i32;
+                    let mut inst = u32::from_le_bytes(data.try_into().expect("Invalid instruction length"));
+                    // Clear imm fields: bit31, 30:25, 11:8, bit7
+                    inst &= !( (1u32 << 31) | (0x3fu32 << 25) | (0xfu32 << 8) | (1u32 << 7) );
+                    // Set imm bits
+                    inst |= (((imm12 >> 12) & 1) as u32) << 31;
+                    inst |= (((imm12 >> 5) & 0x3f) as u32) << 25;
+                    inst |= (((imm12 >> 1) & 0xf) as u32) << 8;
+                    inst |= (((imm12 >> 11) & 1) as u32) << 7;
+                    data.copy_from_slice(&inst.to_le_bytes());
+                }
+
+                RiscvReloc::Call => {
+                    if !(-1 << 31 <= delta && delta < 1 << 31) {
+                        panic!("CALL offset out of range: {}", delta);
+                    }
+                    let imm20 = ((delta + 0x800) >> 12) as i32; // AUIPC imm
+                    let imm12 = delta as i32 & 0xfff; // JALR imm
+                    let mut inst = u32::from_le_bytes(data.try_into().unwrap());
+                    inst &= !(0xfffff000); // Clear AUIPC imm[31:12].
+                    inst |= (imm20 as u32) << 12;
+                    // NOTE: JALR is in the next 4 bytes; need to handle both.
+                    // This assumes data slice includes AUIPC + JALR (8 bytes).
+                    let jalr_slice = &mut data[4..8];
+                    let mut jalr_inst = u32::from_le_bytes(jalr_slice.try_into().unwrap());
+                    jalr_inst &= !(0xfff << 20); // Clear JALR imm[11:0].
+                    jalr_inst |= (imm12 as u32) << 20;
+                    data[0..4].copy_from_slice(&inst.to_le_bytes());
+                    data[4..8].copy_from_slice(&jalr_inst.to_le_bytes());
+                }
+
+                RiscvReloc::PcrelHi20 => {
+                    if !(-1 << 31 <= delta && delta < 1 << 31) {
+                        panic!("PCREL_HI20 offset out of range: {}", delta);
+                    }
+                    let imm20 = ((delta + 0x800) >> 12) as i32; // Add 0x800 for rounding.
+                    let mut inst = u32::from_le_bytes(data.try_into().unwrap());
+                    inst &= !(0xfffff000); // Clear imm[31:12].
+                    inst |= (imm20 as u32) << 12;
+                    data.copy_from_slice(&inst.to_le_bytes());
+                }
+
+                RiscvReloc::PcrelLo12I => {
+                    if !(-2048 <= delta && delta < 2048) {
+                        panic!("PCREL_LO12_I offset out of range: {}", delta);
+                    }
+                    let imm12 = delta as i32;
+                    let mut inst = u32::from_le_bytes(data.try_into().unwrap());
+                    inst &= !(0xfff << 20); // Clear imm[11:0].
+                    inst |= (imm12 as u32) << 20;
+                    data.copy_from_slice(&inst.to_le_bytes());
+                }
+
+                _ => unimplemented!()
+            }
+        }
+
+        let relocs = std::mem::take(&mut self.relocs);
+
+        let mut new_relocs = Vec::new();
+        for (section_id, reloc) in relocs {
+            let sym = self.obj.symbol(reloc.sym);
+
+            if sym.scope != SymbolScope::Compilation { continue }
+
+            if !matches!{
+                sym.section,
+                SymbolSection::Section(sid) if sid == section_id
+            } {
+                new_relocs.push((section_id, reloc));
+                continue
+            }
+
+            let delta = sym.value as i64 + reloc.addend - reloc.offset as i64;
+            let data = self.obj.section_mut(section_id).data_mut();
+            let slice = &mut data[reloc.offset as usize..reloc.offset as usize + 4];
+            apply_reloc(slice, reloc.type_, delta);
+        }
+
+        self.relocs = new_relocs;
+    }
+
+    #[inline(always)]
+    pub fn emit_branch_to(&mut self, i: asm_riscv::I, label: Label) {
+        let section_id = self.curr_section.expect("No current section");
+        let offset = self.emit_bytes_with_reloc(i, (label.sym, RiscvReloc::Branch));
+        self.relocs.push((
+            section_id,
+            Reloc {
+                offset,
+                sym: label.sym,
+                type_: RiscvReloc::Branch,
+                addend: 0,
+            },
+        ));
     }
 
     #[inline]
@@ -223,7 +380,7 @@ impl<'a> Assembler<'a> {
         );
 
         if let Some(reloc) = reloc {
-            self.add_reloc(offset, section, reloc)
+            self.add_reloc(offset, section, 0, reloc)
         }
 
         offset
@@ -343,6 +500,25 @@ impl<'a> Assembler<'a> {
     pub fn emit_call_plt(&mut self, target_sym: SymbolId) {
         let section = self.expect_curr_section();
         self.emit_call_plt_at(section, target_sym);
+    }
+
+    #[inline]
+    pub fn emit_call_direct_at(&mut self, sym: SymbolId, section: SectionId) {
+        self.emit_bytes_with_reloc_at(
+            I::AUIPC { d: Reg::T0, im: 0 },
+            section,
+            (sym, RiscvReloc::Call),
+        );
+        self.emit_bytes_at(
+            I::JALR { d: Reg::RA, s: Reg::T0, im: 0 },
+            section,
+        );
+    }
+
+    #[inline]
+    pub fn emit_call_direct(&mut self, sym: SymbolId) {
+        let section = self.expect_curr_section();
+        self.emit_call_direct_at(sym, section);
     }
 
     #[inline]

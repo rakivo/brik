@@ -1,12 +1,12 @@
 //! Abstraction over RISC-V relocation kinds
 
-#[derive(Eq, Copy, Clone, PartialEq)]
+#[derive(Eq, Copy, Clone, Debug, PartialEq)]
 pub enum RiscvReloc {
-    Branch,
-    PcrelHi20,
-    PcrelLo12I,
-    CallPlt,
-    // ...
+    Branch,      // R_RISCV_BRANCH (16)
+    PcrelHi20,   // R_RISCV_PCREL_HI20 (23)
+    PcrelLo12I,  // R_RISCV_PCREL_LO12_I (24)
+    CallPlt,     // R_RISCV_CALL_PLT (19)
+    Call         // R_RISCV_CALL (2)
 }
 
 impl RiscvReloc {
@@ -17,6 +17,7 @@ impl RiscvReloc {
             Self::PcrelHi20 => 23,
             Self::PcrelLo12I => 24,
             Self::CallPlt => 19,
+            Self::Call => 2
         }
     }
 }
