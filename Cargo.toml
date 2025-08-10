@@ -12,3 +12,8 @@ object    = { version = "0.37.2", default-features = false, features = ["write",
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
+
+[[example]]
+name = "countdown"
+path = "examples/countdown.rs"
+

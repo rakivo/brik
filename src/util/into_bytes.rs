@@ -1,7 +1,6 @@
 //! Helper trait for converting T to bytes
 
 use std::borrow::Cow;
-use std::{slice, mem};
 
 use smallvec::SmallVec;
 
@@ -46,19 +45,6 @@ impl<'a, A: smallvec::Array<Item = u8>> IntoBytes<'a> for SmallVec<A> {
     }
 }
 
-impl<'a> IntoBytes<'a> for u32 {
-    #[inline(always)]
-    fn into_bytes(self) -> Cow<'a, [u8]> {
-        let bytes = unsafe {
-            slice::from_raw_parts(
-                &self as *const Self as *const _,
-                mem::size_of::<Self>(),
-            )
-        };
-        Cow::Owned(bytes.to_vec())
-    }
-}
-
 impl<'a> IntoBytes<'a> for asm_riscv::I {
     #[inline(always)]
     fn into_bytes(self) -> Cow<'a, [u8]> {
@@ -66,3 +52,20 @@ impl<'a> IntoBytes<'a> for asm_riscv::I {
     }
 }
 
+macro_rules! impl_into_bytes_for_int {
+    ($($t:ty),* $(,)?) => { $(
+        impl<'a> IntoBytes<'a> for $t {
+            #[inline(always)]
+            fn into_bytes(self) -> Cow<'a, [u8]> {
+                Cow::Owned(Vec::from(self.to_le_bytes()))
+            }
+        }
+    )* };
+}
+
+// implement for signed/unsigned integer scalars (including pointer-sized)
+impl_into_bytes_for_int!{
+    u8, u16, u32, u64, u128,
+    i8, i16, i32, i64, i128,
+    usize, isize,
+}
