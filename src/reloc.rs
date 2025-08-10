@@ -23,7 +23,8 @@ pub enum RelocKind {
     PcrelHi20  = 23, // R_RISCV_PCREL_HI20
     PcrelLo12I = 24, // R_RISCV_PCREL_LO12_I
     CallPlt    = 19, // R_RISCV_CALL_PLT
-    Call       = 2   // R_RISCV_CALL
+    Call       = 18, // R_RISCV_CALL
+    Jal        = 17, // R_RISCV_JAL
 }
 
 impl RelocKind {

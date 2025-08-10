@@ -133,7 +133,7 @@ impl<'a> Assembler<'a> {
         &mut self,
         part: PcrelPart
     ) -> String {
-        format!{
+        let l = format!{
             ".Lpcrel_{p}{lbl}",
             p = match part {
                 PcrelPart::Hi20  => "hi20",
@@ -141,7 +141,10 @@ impl<'a> Assembler<'a> {
                 PcrelPart::Lo12S => "lo12s",
             },
             lbl = self.pcrel_counter
-        }
+        };
+
+        self.pcrel_counter += 1;
+        l
     }
 
     #[inline]
@@ -220,7 +223,7 @@ impl<'a> Assembler<'a> {
                         panic!("Branch offset out of range: {delta}");
                     }
 
-                    let imm12 = (delta / 2) as i32;
+                    let imm13 = delta as i32;
                     let mut inst = u32::from_le_bytes(
                         data.try_into().expect("invalid instruction length")
                     );
@@ -234,12 +237,39 @@ impl<'a> Assembler<'a> {
                     // imm[11]   -> bit   7
 
                     // set imm bits
-                    inst |= (((imm12 >> 12) & 0x01) as u32) << 31;
-                    inst |= (((imm12 >>  5) & 0x3f) as u32) << 25;
-                    inst |= (((imm12 >>  1) & 0xf)  as u32) <<  8;
-                    inst |= (((imm12 >> 11) & 0x01) as u32) <<  7;
+                    inst |= (((imm13 >> 12) & 0x01) as u32) << 31;
+                    inst |= (((imm13 >>  5) & 0x3f) as u32) << 25;
+                    inst |= (((imm13 >>  1) & 0xf)  as u32) <<  8;
+                    inst |= (((imm13 >> 11) & 0x01) as u32) <<  7;
 
                     inst.copy_into(data);
+                }
+
+                RelocKind::Jal => {
+                    if !(-1048576..=1048574).contains(&delta) || delta % 2 != 0 {
+                        panic!("JAL offset out of range: {delta}");
+                    }
+
+                    let imm21 = delta as i32; // Don't divide by 2 yet!
+                    let mut inst = u32::from_le_bytes(
+                        data.try_into().expect("invalid instruction length")
+                    );
+
+                    // Clear the immediate field (bits 31:12)
+                    inst &= 0x00000fff;
+
+                    // JAL immediate encoding in RISC-V:
+                    // inst[31]    = imm[20]    (sign bit)
+                    // inst[30:21] = imm[10:1]
+                    // inst[20]    = imm[11]
+                    // inst[19:12] = imm[19:12]
+
+                    inst |= (((imm21 >> 20) & 0x1) as u32) << 31;    // imm[20] -> bit 31
+                    inst |= (((imm21 >> 1) & 0x3ff) as u32) << 21;   // imm[10:1] -> bits 30:21
+                    inst |= (((imm21 >> 11) & 0x1) as u32) << 20;    // imm[11] -> bit 20
+                    inst |= (((imm21 >> 12) & 0xff) as u32) << 12;   // imm[19:12] -> bits 19:12
+
+                    data.copy_from_slice(&inst.to_le_bytes());
                 }
 
                 RelocKind::Call | RelocKind::CallPlt => {
@@ -337,19 +367,33 @@ impl<'a> Assembler<'a> {
     #[inline(always)]
     pub fn emit_branch_to(&mut self, i: asm_riscv::I, label: Label) {
         let section_id = self.expect_curr_section();
-        let offset = self.emit_bytes_with_reloc(
-            i,
-            (label.sym, RelocKind::Branch)
-        );
+        let offset = self.emit_bytes(i);
+
+        // determine rtype
+        let rtype = match i {
+            I::JAL { .. } => RelocKind::Jal,
+            I::BEQ { .. } | I::BNE { .. } | I::BLT { .. } | I::BGE { .. } |
+            I::BLTU { .. } | I::BGEU { .. } => RelocKind::Branch,
+            _ => unimplemented!("unsupported branch instruction type"),
+        };
+
         self.relocs.push((
             section_id,
             Reloc {
                 offset,
                 symbol: label.sym,
-                rtype: RelocKind::Branch,
+                rtype,
                 addend: 0,
-            },
+            }
         ));
+    }
+
+    #[inline]
+    pub fn patch_label_with_current_offset(&mut self, label: Label) {
+        let section_id = self.expect_curr_section();
+        let offset = self.section_size(section_id) as u64;
+        let sym = &mut self.obj.symbol_mut(label.sym);
+        sym.value = offset;
     }
 
     #[inline]
