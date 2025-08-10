@@ -8,6 +8,16 @@ pub struct RiscvAttrsBuilder {
 
 impl RiscvAttrsBuilder {
     /// Create a new builder with vendor string (usually "riscv")
+    ///
+    /// # Example
+    /// ```
+    /// use brik::util::attr_builder::RiscvAttrsBuilder;
+    /// let builder = RiscvAttrsBuilder::new("riscv")
+    ///     .arch("rv64im")
+    ///     .tag(0x42, b"data");
+    /// let bytes = builder.build();
+    /// assert!(bytes.len() > 0);
+    /// ```
     #[inline(always)]
     pub fn new(vendor: &str) -> Self {
         Self {
@@ -17,6 +27,14 @@ impl RiscvAttrsBuilder {
     }
 
     /// Add the architecture string tag (tag 0x18)
+    ///
+    /// # Example
+    /// ```
+    /// use brik::util::attr_builder::RiscvAttrsBuilder;
+    /// let builder = RiscvAttrsBuilder::new("riscv").arch("rv64gc");
+    /// let bytes = builder.build();
+    /// assert!(bytes.contains(&0x18));
+    /// ```
     #[inline(always)]
     pub fn arch(mut self, isa_str: &str) -> Self {
         self.tags.push((0x18, isa_str.as_bytes().to_vec()));
@@ -24,6 +42,14 @@ impl RiscvAttrsBuilder {
     }
 
     /// Add a custom tag (tag byte and raw bytes)
+    ///
+    /// # Example
+    /// ```
+    /// use brik::util::attr_builder::RiscvAttrsBuilder;
+    /// let builder = RiscvAttrsBuilder::new("riscv").tag(0x42, b"xyz");
+    /// let bytes = builder.build();
+    /// assert!(bytes.contains(&0x42));
+    /// ```
     #[inline(always)]
     pub fn tag(mut self, tag_byte: u8, data: &[u8]) -> Self {
         self.tags.push((tag_byte, data.to_vec()));
@@ -31,6 +57,16 @@ impl RiscvAttrsBuilder {
     }
 
     /// Build the final attribute bytes
+    ///
+    /// # Example
+    /// ```
+    /// use brik::util::attr_builder::RiscvAttrsBuilder;
+    /// let bytes = RiscvAttrsBuilder::new("riscv")
+    ///     .arch("rv64im")
+    ///     .tag(0x42, b"data")
+    ///     .build();
+    /// assert_eq!(bytes[0], 0x41); // Format version
+    /// ```
     pub fn build(self) -> Vec<u8> {
         let mut bytes = Vec::new();
 

@@ -62,6 +62,19 @@ impl<'a> DerefMut for Assembler<'a> {
 impl<'a> Assembler<'a> {
     const RELOC_PREALLOCATION_COUNT: usize = 4;
 
+    /// Create a new `Assembler` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use brik::{asm, object};
+    /// let mut asm = asm::Assembler::new(
+    ///     object::BinaryFormat::Elf,
+    ///     object::Architecture::Riscv64,
+    ///     object::Endianness::Little,
+    ///     "rv64gc",
+    /// );
+    /// ```
     pub fn new(
         format: BinaryFormat,
         arch: Architecture,
@@ -231,12 +244,6 @@ impl<'a> Assembler<'a> {
                     // clear imm fields: bit31, 30:25, 11:8, bit7
                     inst &= !((1u32 << 31) | (0x3fu32 << 25) | (0xfu32 << 8) | (1u32 << 7));
 
-                    // imm[12]   -> bit  31
-                    // imm[10:5] -> bits 30:25
-                    // imm[4:1]  -> bits 11:8
-                    // imm[11]   -> bit   7
-
-                    // set imm bits
                     inst |= (((imm13 >> 12) & 0x01) as u32) << 31;
                     inst |= (((imm13 >>  5) & 0x3f) as u32) << 25;
                     inst |= (((imm13 >>  1) & 0xf)  as u32) <<  8;
@@ -250,24 +257,18 @@ impl<'a> Assembler<'a> {
                         panic!("JAL offset out of range: {delta}");
                     }
 
-                    let imm21 = delta as i32; // Don't divide by 2 yet!
+                    let imm21 = delta as i32;
                     let mut inst = u32::from_le_bytes(
                         data.try_into().expect("invalid instruction length")
                     );
 
-                    // Clear the immediate field (bits 31:12)
+                    // clear the imm field (bits 31:12)
                     inst &= 0x00000fff;
 
-                    // JAL immediate encoding in RISC-V:
-                    // inst[31]    = imm[20]    (sign bit)
-                    // inst[30:21] = imm[10:1]
-                    // inst[20]    = imm[11]
-                    // inst[19:12] = imm[19:12]
-
-                    inst |= (((imm21 >> 20) & 0x1) as u32) << 31;    // imm[20] -> bit 31
-                    inst |= (((imm21 >> 1) & 0x3ff) as u32) << 21;   // imm[10:1] -> bits 30:21
-                    inst |= (((imm21 >> 11) & 0x1) as u32) << 20;    // imm[11] -> bit 20
-                    inst |= (((imm21 >> 12) & 0xff) as u32) << 12;   // imm[19:12] -> bits 19:12
+                    inst |= (((imm21 >> 20) & 0x001) as u32) << 31; // imm[20]    -> bit 31
+                    inst |= (((imm21 >> 1)  & 0x3ff) as u32) << 21; // imm[10:1]  -> bits 30:21
+                    inst |= (((imm21 >> 11) & 0x001) as u32) << 20; // imm[11]    -> bit 20
+                    inst |= (((imm21 >> 12) & 0x0ff) as u32) << 12; // imm[19:12] -> bits 19:12
 
                     data.copy_from_slice(&inst.to_le_bytes());
                 }
@@ -296,8 +297,8 @@ impl<'a> Assembler<'a> {
                     jalr_inst &= !(0xfff << 20); // clear JALR imm[11:0]
                     jalr_inst |= (imm12 as u32) << 20;
 
-                    data[0..4].copy_from_slice(&inst.to_le_bytes());
-                    data[4..8].copy_from_slice(&jalr_inst.to_le_bytes());
+                    inst.copy_into(&mut data[0..4]);
+                    jalr_inst.copy_into(&mut data[4..8]);
                 }
 
                 RelocKind::PcrelHi20 => {

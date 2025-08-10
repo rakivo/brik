@@ -11,6 +11,16 @@ pub type RV64Bytes = SmallVec<[u8; mem::size_of::<u32>() * 3]>;
 
 /// Encode RISC-V LD (Load Doubleword) instruction.
 /// imm is a signed 12-bit offset.
+///
+/// # Example
+///
+/// Runnable check for an LD with offset 0:
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_ld;
+/// let inst = encode_ld(Reg::S1, Reg::S2, 0);
+/// assert_eq!(inst, 0x093483); // LD a0, 0(sp)
+/// ```
 #[inline(always)]
 pub const fn encode_ld(rd: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12 = (imm as u32) & 0xfff;
@@ -22,6 +32,14 @@ pub const fn encode_ld(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 }
 
 /// Encode RISC-V MUL (Multiplication) instruction.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mul;
+/// let inst = encode_mul(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02c58533); // mul a0, a1, a2
+/// ```
 #[inline(always)]
 pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
       (0x01 << 25)         // funct7 = 0x01
@@ -34,6 +52,14 @@ pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 
 /// Encode RISC-V SD (Store Doubleword) instruction.
 /// imm is a signed 12-bit offset.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_sd;
+/// let inst = encode_sd(Reg::A0, Reg::SP, 0);
+/// assert_eq!(inst, 0xa13023); // sd a0, 0(sp)
+/// ```
 #[inline(always)]
 pub const fn encode_sd(rs2: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12    = (imm as u32) & 0xfff;
@@ -49,6 +75,14 @@ pub const fn encode_sd(rs2: Reg, rs1: Reg, imm: i16) -> u32 {
 }
 
 /// Expand `li rd, imm` for RV64 and return its encoding as little-endian bytes.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_li_rv64_little;
+/// let bytes = encode_li_rv64_little(Reg::A0, 42);
+/// assert_eq!(bytes.as_slice(), [0x13, 0x05, 0xa0, 0x02]); // addi a0, zero, 42
+/// ```
 pub fn encode_li_rv64_little(rd: Reg, imm: i64) -> RV64Bytes {
     let mut bytes = RV64Bytes::new();
 
