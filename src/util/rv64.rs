@@ -21,6 +21,17 @@ pub const fn encode_ld(rd: Reg, rs1: Reg, imm: i16) -> u32 {
         | 0x03                 // opcode = 0x03 for LOAD
 }
 
+/// Encode RISC-V MUL (Multiplication) instruction.
+#[inline(always)]
+pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+      (0x01 << 25)         // funct7 = 0x01
+    | ((rs2 as u32) << 20)
+    | ((rs1 as u32) << 15)
+    | (0x0 << 12)          // funct3 = 0x0 for mul
+    | ((rd as u32) << 7)
+    | 0x33                 // opcode = 0x33 (OP)
+}
+
 /// Encode RISC-V SD (Store Doubleword) instruction.
 /// imm is a signed 12-bit offset.
 #[inline(always)]
