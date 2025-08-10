@@ -1,6 +1,5 @@
 use brik::util::rv64;
 use brik::asm::Assembler;
-use brik::reloc::RiscvReloc;
 use brik::asm_riscv::{I, Reg};
 use brik::object::{
     Endianness,
@@ -76,14 +75,7 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.emit_pcrel_load_addr(Reg::S1, countdown_sym);
     asm.emit_bytes(rv64::encode_ld(Reg::S1, Reg::S1, 0));
 
-    let loop_offset = asm.section(text_section).data().len() as u64;
-    let loop_sym = asm.add_symbol(
-        b".loop",
-        loop_offset,
-        0,
-        SymbolKind::Text,
-        SymbolScope::Compilation,
-    );
+    let loop_lbl = asm.new_label(b".loop");
 
     // a0 = msg
     asm.emit_pcrel_load_addr(Reg::A0, msg_sym);
@@ -100,13 +92,12 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     );
 
     // blt 0, s1
-    asm.emit_bytes_with_reloc(
+    asm.emit_branch_to(
         I::BLT {
             s1: Reg::ZERO,
             s2: Reg::S1,
             im: 0
-        },
-        (loop_sym, RiscvReloc::Branch)
+        }, loop_lbl
     );
 
     asm.emit_function_epilogue();
@@ -143,6 +134,3 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     Ok(())
 }
-
-
-
