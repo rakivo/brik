@@ -25,8 +25,8 @@ pub const fn encode_ld(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 /// imm is a signed 12-bit offset.
 #[inline(always)]
 pub const fn encode_sd(rs2: Reg, rs1: Reg, imm: i16) -> u32 {
-    let imm12 = (imm as u32) & 0xfff;
-    let imm_low = imm12 & 0x1f;         // imm[4:0]
+    let imm12    = (imm as u32) & 0xfff;
+    let imm_low  = imm12 & 0x1f;        // imm[4:0]
     let imm_high = (imm12 >> 5) & 0x7f; // imm[11:5]
 
     (imm_high << 25)           // imm[11:5]

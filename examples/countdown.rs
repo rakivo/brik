@@ -127,7 +127,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let obj = produce_countdown_obj();
 
-    let file = fs::File::create(&output_path)?;
+    let file = fs::File::create(output_path)?;
     obj.write_stream(&file)?;
 
     println!("[wrote object file to {output_path}]");

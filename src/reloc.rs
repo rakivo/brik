@@ -1,24 +1,35 @@
 //! Abstraction over RISC-V relocation kinds
 
+use crate::object::write::SymbolId;
+
 #[derive(Eq, Copy, Clone, Debug, PartialEq)]
-pub enum RiscvReloc {
-    Branch,      // R_RISCV_BRANCH (16)
-    PcrelHi20,   // R_RISCV_PCREL_HI20 (23)
-    PcrelLo12I,  // R_RISCV_PCREL_LO12_I (24)
-    CallPlt,     // R_RISCV_CALL_PLT (19)
-    Call         // R_RISCV_CALL (2)
+pub enum PcrelPart {
+    Hi20,
+    Lo12I,
+    Lo12S,
 }
 
-impl RiscvReloc {
+#[derive(Debug)]
+pub struct Reloc {
+    pub offset: u64,
+    pub symbol: SymbolId,
+    pub rtype: RelocKind,
+    pub addend: i64,
+}
+
+#[derive(Eq, Copy, Clone, Debug, PartialEq)]
+pub enum RelocKind {
+    Branch     = 16, // R_RISCV_BRANCH
+    PcrelHi20  = 23, // R_RISCV_PCREL_HI20
+    PcrelLo12I = 24, // R_RISCV_PCREL_LO12_I
+    CallPlt    = 19, // R_RISCV_CALL_PLT
+    Call       = 2   // R_RISCV_CALL
+}
+
+impl RelocKind {
     #[inline(always)]
     pub const fn code(self) -> u32 {
-        match self {
-            Self::Branch => 16,
-            Self::PcrelHi20 => 23,
-            Self::PcrelLo12I => 24,
-            Self::CallPlt => 19,
-            Self::Call => 2
-        }
+        self as _
     }
 }
 

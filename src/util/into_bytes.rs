@@ -9,11 +9,11 @@ pub trait IntoBytes<'a> {
     fn into_bytes(self) -> Cow<'a, [u8]>;
 
     #[inline(always)]
-    fn move_into(self, dst: &mut Vec<u8>)
+    fn copy_into(self, dst: &mut [u8])
     where
         Self: Sized
     {
-        dst.extend_from_slice(&self.into_bytes())
+        dst.copy_from_slice(&self.into_bytes())
     }
 }
 
