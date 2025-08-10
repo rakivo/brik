@@ -24,7 +24,6 @@ impl RiscvAttrsBuilder {
     }
 
     /// Add a custom tag (tag byte and raw bytes)
-    #[allow(unused)]
     #[inline(always)]
     pub fn tag(mut self, tag_byte: u8, data: &[u8]) -> Self {
         self.tags.push((tag_byte, data.to_vec()));

@@ -1,3 +1,5 @@
+//! Helper trait for converting T to bytes
+
 use std::borrow::Cow;
 use std::{slice, mem};
 
@@ -7,7 +9,6 @@ pub trait IntoBytes<'a> {
     #[must_use]
     fn into_bytes(self) -> Cow<'a, [u8]>;
 
-    #[allow(unused)]
     #[inline(always)]
     fn move_into(self, dst: &mut Vec<u8>)
     where

@@ -1,7 +1,7 @@
-use krasm::util::rv64;
-use krasm::asm::Assembler;
-use krasm::asm_riscv::{I, Reg};
-use krasm::object::{
+use brik::util::rv64;
+use brik::asm::Assembler;
+use brik::asm_riscv::{I, Reg};
+use brik::object::{
     Endianness,
     SymbolKind,
     SymbolScope,
@@ -9,7 +9,7 @@ use krasm::object::{
     Architecture,
     BinaryFormat,
 };
-use krasm::object::write::{
+use brik::object::write::{
     Object,
     FileFlags,
     StandardSegment,
@@ -95,16 +95,18 @@ fn produce_add_34_35_obj<'a>() -> Object<'a> {
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     let args = env::args().collect::<Vec<_>>();
-    if args.len() < 2 {
-        println!("usage: krasm <output.o>");
-        return Ok(())
-    }
 
-    let output_path = &args[1];
+    let Some(output_path) = args.get(1) else {
+        println!{
+            "usage: {prog} <output.o>",
+            prog = args[0]
+        };
+        return Ok(())
+    };
 
     let obj = produce_add_34_35_obj();
 
-    let file = fs::File::create(output_path)?;
+    let file = fs::File::create(&output_path)?;
     obj.write_stream(&file)?;
 
     println!("[wrote object file to {output_path}]");

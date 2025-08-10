@@ -1,3 +1,5 @@
+//! Object file builder
+
 use crate::util::rv64;
 use crate::reloc::RiscvReloc;
 use crate::asm_riscv::{I, Reg};

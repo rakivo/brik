@@ -1,4 +1,6 @@
-#[derive(Clone, Copy, PartialEq, Eq)]
+//! Abstraction over RISC-V relocation kinds
+
+#[derive(Eq, Copy, Clone, PartialEq)]
 pub enum RiscvReloc {
     PcrelHi20,
     PcrelLo12I,
