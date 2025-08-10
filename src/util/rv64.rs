@@ -1,3 +1,5 @@
+//! RV64 extension for asm_riscv (RV32)
+
 use std::mem;
 
 use crate::util::into_bytes::IntoBytes;

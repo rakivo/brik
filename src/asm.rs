@@ -26,6 +26,7 @@ use crate::object::write::{
 
 use std::ops::{Deref, DerefMut};
 
+/// Object file builder
 #[derive(Debug)]
 pub struct Assembler<'a> {
     obj: Object<'a>,
@@ -49,7 +50,6 @@ impl<'a> DerefMut for Assembler<'a> {
     }
 }
 
-#[allow(unused)]
 impl<'a> Assembler<'a> {
     pub fn new(
         format: BinaryFormat,
