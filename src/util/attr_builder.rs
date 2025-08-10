@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct RiscvAttrsBuilder {
     vendor: Vec<u8>,
     tags: Vec<(u8, Vec<u8>)>,
@@ -32,35 +33,34 @@ impl RiscvAttrsBuilder {
     pub fn build(self) -> Vec<u8> {
         let mut bytes = Vec::new();
 
-        // Format version
+        // format version
         bytes.push(0x41);
 
-        // Placeholder for total length
+        // placeholder for total length
         bytes.extend(&[0, 0, 0, 0]);
 
-        // Vendor + null terminator
+        // vendor + \0
         bytes.extend(&self.vendor);
         bytes.push(0x00);
 
         // Tag_File (0x01)
         bytes.push(0x01);
 
-        // Placeholder for Tag_File length
+        // placeholder for Tag_File length
         let tag_file_len_pos = bytes.len();
         bytes.extend(&[0, 0, 0, 0]);
 
-        // Add all tags
         for (tag_byte, data) in self.tags {
             bytes.push(tag_byte);
             bytes.extend(&data);
         }
 
-        // Fill in Tag_File length
+        // fill in Tag_File length
         let tag_file_len = (bytes.len() - (tag_file_len_pos + 4)) as u32;
         bytes[tag_file_len_pos..tag_file_len_pos + 4]
             .copy_from_slice(&tag_file_len.to_le_bytes());
 
-        // Fill in total length (from after version byte and total length field, i.e. 5 bytes)
+        // fill in total length (from after version byte and total length field, i.e. 5 bytes)
         let total_len = (bytes.len() - 5) as u32;
         bytes[1..5].copy_from_slice(&total_len.to_le_bytes());
 

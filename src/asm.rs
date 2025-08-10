@@ -26,6 +26,7 @@ use crate::object::write::{
 
 use std::ops::{Deref, DerefMut};
 
+#[derive(Debug)]
 pub struct Assembler<'a> {
     obj: Object<'a>,
     label_counter: u32,
