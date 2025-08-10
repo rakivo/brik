@@ -15,7 +15,7 @@ use brik::object::write::{
     StandardSegment,
 };
 
-use std::{fs, env, mem, error};
+use std::{fs, env, error};
 
 fn produce_factorial_obj<'a>() -> Object<'a> {
     let mut asm = Assembler::new(
@@ -31,38 +31,57 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
         e_flags: 0x4,
     });
 
+    // .rodata section for format strings
     let _rodata = asm.add_section_at_end(
         StandardSegment::Data,
         b".rodata",
         SectionKind::ReadOnlyData,
     );
 
-    let fmt_bytes = b"Factorial: %d\n\0";
-    let fmt_offset = asm.emit_bytes(fmt_bytes);
-    let fmt_sym = asm.add_symbol(
-        b"fmt",
-        fmt_offset,
-        fmt_bytes.len() as u64,
+    let input_fmt_bytes = b"enter a number: \0";
+    let input_fmt_offset = asm.emit_bytes(input_fmt_bytes);
+    let input_fmt_sym = asm.add_symbol(
+        b"input_fmt",
+        input_fmt_offset,
+        input_fmt_bytes.len() as u64,
         SymbolKind::Data,
         SymbolScope::Compilation,
     );
 
-    let n: u64 = 5;
-    let n_off = asm.emit_bytes(n);
-    let n_sym = asm.add_symbol(
-        b"n",
-        n_off,
-        8,
+    let scanf_fmt_bytes = b"%ld\0";
+    let scanf_fmt_offset = asm.emit_bytes(scanf_fmt_bytes);
+    let scanf_fmt_sym = asm.add_symbol(
+        b"scanf_fmt",
+        scanf_fmt_offset,
+        scanf_fmt_bytes.len() as u64,
         SymbolKind::Data,
         SymbolScope::Compilation,
     );
 
+    let result_fmt_bytes = b"factorial: %ld\n\0";
+    let result_fmt_offset = asm.emit_bytes(result_fmt_bytes);
+    let result_fmt_sym = asm.add_symbol(
+        b"result_fmt",
+        result_fmt_offset,
+        result_fmt_bytes.len() as u64,
+        SymbolKind::Data,
+        SymbolScope::Compilation,
+    );
+
+    // external symbols
     let printf_sym = asm.add_symbol_extern(
         b"printf",
         SymbolKind::Text,
         SymbolScope::Dynamic
     );
 
+    let scanf_sym = asm.add_symbol_extern(
+        b"scanf",
+        SymbolKind::Text,
+        SymbolScope::Dynamic
+    );
+
+    // .text section
     let text_section = asm.add_section_at_end(
         StandardSegment::Text,
         b".text",
@@ -71,38 +90,58 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
 
     asm.emit_function_prologue();
 
-    // Load n into t0 (counter)
-    asm.emit_pcrel_load_addr(Reg::T0, n_sym);
-    asm.emit_bytes(rv64::encode_ld(Reg::T0, Reg::T0, 0));
+    // allocate space on stack for input number (8 bytes)
+    asm.emit_bytes(I::ADDI { d: Reg::SP, s: Reg::SP, im: -8 });
 
-    // result in t1 = 1
-    asm.emit_bytes(I::ADDI { d: Reg::T1, s: Reg::ZERO, im: 1 });
-
-    let loop_lbl = asm.new_label(b".loop");
-
-    // if t0 <= 1, break
-    asm.emit_branch_to(
-        I::BLE { s1: Reg::T0, s2: Reg::X1, im: 0 },
-        loop_lbl,
-    );
-
-    // result *= t0
-    asm.emit_bytes(R::MUL { d: Reg::T1, s1: Reg::T1, s2: Reg::T0 });
-
-    // t0 -= 1
-    asm.emit_bytes(I::ADDI { d: Reg::T0, s: Reg::T0, im: -1 });
-
-    // loop
-    asm.emit_branch_to(
-        I::BNE { s1: Reg::T0, s2: Reg::ZERO, im: 0 },
-        loop_lbl,
-    );
-
-    // printf(fmt, result)
-    asm.emit_pcrel_load_addr(Reg::A0, fmt_sym);
-    asm.emit_bytes(I::ADDI { d: Reg::A1, s: Reg::T1, im: 0 });
+    // print input prompt
+    asm.emit_pcrel_load_addr(Reg::A0, input_fmt_sym);
     asm.emit_call_plt(printf_sym);
 
+    // read input number
+    asm.emit_pcrel_load_addr(Reg::A0, scanf_fmt_sym);
+    asm.emit_bytes(I::ADDI { d: Reg::A1, s: Reg::SP, im: 0 });
+    asm.emit_call_plt(scanf_sym);
+
+    // load input number into s1
+    asm.emit_bytes(rv64::encode_ld(Reg::S1, Reg::SP, 0));
+
+    // init factorial result in s2 (result = 1)
+    asm.emit_bytes(I::ADDI { d: Reg::S2, s: Reg::ZERO, im: 1 });
+
+    // init counter in s3 (i = 1)
+    asm.emit_bytes(I::ADDI { d: Reg::S3, s: Reg::ZERO, im: 1 });
+
+    let loop_lbl = asm.new_label(b".fact_loop");
+    let done_lbl = asm.new_label(b".fact_done");
+
+    // loop condition: if i > n, exit
+    asm.emit_branch_to(
+        // if s1 < s3 (n < i)
+        I::BLT { s1: Reg::S1, s2: Reg::S3, im: 0 },
+        done_lbl
+    );
+
+    // result *= i
+    asm.emit_bytes(rv64::encode_mul(Reg::S2, Reg::S2, Reg::S3));
+
+    // i++
+    asm.emit_bytes(I::ADDI { d: Reg::S3, s: Reg::S3, im: 1 });
+
+    // jump back to loop
+    asm.emit_branch_to(
+        I::JAL { d: Reg::ZERO, im: 0 },
+        loop_lbl
+    );
+
+    asm.patch_label_with_current_offset(done_lbl);
+
+    // print result
+    asm.emit_pcrel_load_addr(Reg::A0, result_fmt_sym);
+    asm.emit_bytes(I::ADDI { d: Reg::A1, s: Reg::S2, im: 0 }); // move result to a1
+    asm.emit_call_plt(printf_sym);
+
+    // restore stack and return
+    asm.emit_bytes(I::ADDI { d: Reg::SP, s: Reg::SP, im: 8 });
     asm.emit_function_epilogue();
     asm.emit_return_imm(0);
 
