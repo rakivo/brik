@@ -1,10 +1,14 @@
 //! Object file builder
 
-use crate::util::rv64;
+use crate::util::{diag, rv64};
 use crate::asm_riscv::{I, Reg};
 use crate::util::into_bytes::IntoBytes;
 use crate::reloc::{Reloc, PcrelPart, RelocKind};
 use crate::util::attr_builder::RiscvAttrsBuilder;
+use crate::util::diag::{
+    DiagnosticRenderer,
+    UnplacedLabelDiagnostic
+};
 use crate::object::{
     Endianness,
     SymbolKind,
@@ -30,15 +34,7 @@ use std::sync::Arc;
 use std::ops::{Deref, DerefMut};
 use std::{fs, mem, str, fmt, panic};
 
-use memchr::Memchr;
-use thiserror::Error;
 use rustc_hash::FxHashMap;
-use miette::{
-    Diagnostic,
-    SourceSpan,
-    NamedSource,
-    GraphicalReportHandler,
-};
 
 #[derive(Eq, Ord, Hash, Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct LabelId(usize);
@@ -53,41 +49,19 @@ pub struct UnplacedLabelInfo {
     caller_loc: &'static panic::Location<'static>
 }
 
-#[derive(Debug, Error, Diagnostic)]
-#[error("unplaced label '{name}'")]
-struct UnplacedLabelDiagnostic {
-    /// Will be rendered above the snippet as the main error message
-    #[diagnostic(code(brik::unplaced_label))]
-    pub name: String,
-
-    /// The span inside `src` that should be highlighted
-    #[label("label never placed")]
-    pub span: SourceSpan,
-
-    /// The source file content (miette prints this)
-    #[source_code]
-    pub src: NamedSource
-}
-
 /// The FinishError stores the pre-rendered, pretty error text.
 pub struct FinishError {
     /// Rendered miette diagnostic(s)
     pub rendered: String,
 }
 
+debug_from_display!(FinishError);
+
 impl fmt::Display for FinishError {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { rendered } = self;
         write!(f, "{rendered}")
-    }
-}
-
-impl fmt::Debug for FinishError {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f)?;
-        fmt::Display::fmt(self, f)
     }
 }
 
@@ -218,170 +192,6 @@ impl<'a> Assembler<'a> {
     }
 
     fn into_finish_error(mut self) -> FinishError {
-        struct DiagnosticRenderer {
-            handler: GraphicalReportHandler,
-        }
-
-        impl DiagnosticRenderer {
-            const RENDERED_PREALLOCATION_SIZE: usize = 512;
-
-            #[inline(always)]
-            fn new() -> Self {
-                Self { handler: GraphicalReportHandler::new() }
-            }
-
-            #[inline]
-            fn render_to_string(&self, diag: &impl Diagnostic) -> String {
-                let mut rendered = String::with_capacity(
-                    Self::RENDERED_PREALLOCATION_SIZE
-                );
-
-                self.handler
-                    .render_report(&mut rendered, diag)
-                    .expect("render_report should not fail");
-
-                rendered
-            }
-        }
-
-        #[inline(always)]
-        const fn byte_offset_from_line_offsets(
-            line_start : usize,
-            line_end   : usize,
-            target_col : usize
-        ) -> usize {
-            let line_len = line_end - line_start;
-            let col0 = b0(target_col, line_len);
-            line_start + col0
-        }
-
-        /// helper: Convert `v` from 1-based to 0-based, clamping the result with `cap`
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// # const fn b0(v: usize, cap: usize) -> usize {
-        /// #     let v = v.saturating_sub(1);
-        /// #     if v < cap { v } else { cap }
-        /// # }
-        ///
-        /// assert_eq!(b0(1, 10), 0);   // 1-based 1 -> 0-based 0
-        /// assert_eq!(b0(5, 10), 4);   // 1-based 5 -> 0-based 4
-        /// assert_eq!(b0(0, 10), 0);   // saturating_sub prevents underflow; 0 saturates to 0
-        /// assert_eq!(b0(15, 10), 10); // clamped to cap = 10
-        /// assert_eq!(b0(11, 10), 10); // clamped to cap = 10
-        /// ```
-        const fn b0(v: usize, cap: usize) -> usize {
-            let v = v.saturating_sub(1);
-            if v < cap { v } else { cap }
-        }
-
-        fn calculate_byte_offset_small(text: &str, target_line: usize, target_col: usize) -> usize {
-            if target_line == 0 {
-                return b0(target_col, text.len())
-            }
-
-            let mut curr_line = 0;
-            let mut last_newline_pos = 0;
-
-            let mut newline_iter = Memchr::new(b'\n', text.as_bytes());
-            while let Some(pos) = newline_iter.next() {
-                if curr_line + 1 == target_line {
-                    let line_start = pos + 1;
-                    let line_end = newline_iter.next().unwrap_or(text.len());
-                    return byte_offset_from_line_offsets(
-                        line_start,
-                        line_end,
-                        target_col
-                    )
-                }
-
-                curr_line += 1;
-                last_newline_pos = pos;
-            }
-
-            // target line is beyond the file -> use end of file
-            let final_offset = b0(
-                target_col,
-                text.len() - last_newline_pos
-            );
-
-            last_newline_pos + final_offset
-        }
-
-        fn calculate_byte_offset_large(text: &str, target_line: usize, target_col: usize) -> usize {
-            const FINAL_MEMCHR_THRESHOLD : usize = 1024;
-            const BYTECOUNT_CHUNK_SIZE   : usize = 1024 * 8;
-
-            if target_line == 0 {
-                return b0(target_col, text.len());
-            }
-
-            let text_bytes = text.as_bytes();
-            let mut lines_seen = 0;
-            let mut search_start = 0;
-
-            // pass search_start explicitly to avoid borrow conflict
-            let find_line_end_and_calculate_byte_offset = |last_nl_pos: usize, search_start: usize| {
-                let line_start = search_start + last_nl_pos + 1;
-                let line_end = memchr::memchr(b'\n', &text_bytes[line_start..])
-                    .map(|p| line_start + p)
-                    .unwrap_or(text.len());
-
-                byte_offset_from_line_offsets(line_start, line_end, target_col)
-            };
-
-            while lines_seen < target_line && search_start < text_bytes.len() {
-                let remaining = &text_bytes[search_start..];
-
-                if remaining.len() < FINAL_MEMCHR_THRESHOLD {
-                    let Some(pos) = memchr::memchr(b'\n', remaining) else {
-                        break
-                    };
-
-                    lines_seen += 1;
-
-                    if lines_seen == target_line {
-                        return find_line_end_and_calculate_byte_offset(
-                            pos,
-                            search_start
-                        )
-                    }
-
-                    search_start += pos + 1;
-                } else {
-                    let chunk_end = (search_start + BYTECOUNT_CHUNK_SIZE).min(text_bytes.len());
-                    let chunk = &text_bytes[search_start..chunk_end];
-                    let newlines_in_chunk = bytecount::count(chunk, b'\n');
-
-                    if lines_seen + newlines_in_chunk >= target_line {
-                        let mut local_search = 0;
-                        let mut newline_iter = Memchr::new(b'\n', &chunk[local_search..]);
-                        while let Some(pos) = newline_iter.next() {
-                            lines_seen += 1;
-
-                            if lines_seen == target_line {
-                                return find_line_end_and_calculate_byte_offset(
-                                    local_search + pos,
-                                    search_start
-                                )
-                            }
-
-                            local_search += pos + 1;
-                        }
-
-                        break
-                    } else {
-                        lines_seen += newlines_in_chunk;
-                        search_start = chunk_end;
-                    }
-                }
-            }
-
-            let final_offset = b0(target_col, text.len() - search_start);
-            search_start + final_offset
-        }
-
         let renderer = DiagnosticRenderer::new();
 
         let mut file_cache = FxHashMap::<_, Arc<str>>::default();
@@ -395,36 +205,19 @@ impl<'a> Assembler<'a> {
                 .unwrap_or("<invalid UTF-8>")
                 .to_owned();
 
-            let file = info.caller_loc.file().to_owned();
+            let file_path = info.caller_loc.file();
 
-            let content = file_cache.entry(file.to_owned()).or_insert_with(|| {
-                fs::read_to_string(&file).unwrap_or_default().into()
+            let content = file_cache.entry(file_path).or_insert_with(|| {
+                fs::read_to_string(&file_path).unwrap_or_default().into()
             });
 
-            let (named_src, span) = if !content.is_empty() {
-                let l = info.caller_loc.line()   as usize;
-                let c = info.caller_loc.column() as usize;
-
-                const CONTENT_SIZE_THRESHOLD: usize = 10 * 1024;
-
-                let byte_offset = if content.len() < CONTENT_SIZE_THRESHOLD {
-                    calculate_byte_offset_small(content, l - 1, c)
-                } else {
-                    calculate_byte_offset_large(content, l - 1, c)
-                };
-
-                let highlight_len = label_name.len().max(1);
-
-                (
-                    NamedSource::new(file, Arc::clone(&content)),
-                    SourceSpan::new(byte_offset.into(), highlight_len.into()),
-                )
-            } else {
-                (
-                    NamedSource::new(file, ""),
-                    SourceSpan::new(0.into(), 0.into())
-                )
-            };
+            let (named_src, span) = diag::text_into_named_source_and_source_span(
+                Arc::clone(content),
+                file_path,
+                info.caller_loc.line() as _,
+                info.caller_loc.column() as _,
+                label_name.len().max(1)
+            );
 
             let diag = UnplacedLabelDiagnostic {
                 span,
