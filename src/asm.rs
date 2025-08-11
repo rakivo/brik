@@ -55,7 +55,7 @@ pub struct FinishError {
     pub rendered: String,
 }
 
-debug_from_display!(FinishError);
+debug_from_display!(FinishError, newline);
 
 impl fmt::Display for FinishError {
     #[inline(always)]
