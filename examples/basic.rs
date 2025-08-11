@@ -85,12 +85,12 @@ fn produce_add_34_35_obj<'a>() -> Object<'a> {
     asm.add_symbol(
         b"main",
         0,
-        asm.section(text_section).data().len() as u64,
+        asm.section_size(text_section) as _,
         SymbolKind::Text,
         SymbolScope::Dynamic,
     );
 
-    asm.finish()
+    asm.finish().unwrap()
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {

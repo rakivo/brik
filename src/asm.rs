@@ -26,21 +26,83 @@ use crate::object::write::{
     StandardSegment,
 };
 
-use std::mem;
+use std::sync::Arc;
 use std::ops::{Deref, DerefMut};
+use std::{fs, mem, str, fmt, panic};
 
-#[derive(Copy, Clone)]
+use memchr::Memchr;
+use thiserror::Error;
+use rustc_hash::FxHashMap;
+use miette::{
+    Diagnostic,
+    SourceSpan,
+    NamedSource,
+    GraphicalReportHandler,
+};
+
+#[derive(Eq, Ord, Hash, Copy, Clone, Debug, PartialEq, PartialOrd)]
+pub struct LabelId(usize);
+
+#[derive(Copy, Clone, Debug)]
 pub struct Label {
     sym: SymbolId,
+}
+
+#[derive(Debug)]
+pub struct UnplacedLabelInfo {
+    caller_loc: &'static panic::Location<'static>
+}
+
+#[derive(Debug, Error, Diagnostic)]
+#[error("unplaced label '{name}'")]
+struct UnplacedLabelDiagnostic {
+    /// Will be rendered above the snippet as the main error message
+    #[diagnostic(code(brik::unplaced_label))]
+    pub name: String,
+
+    /// The span inside `src` that should be highlighted
+    #[label("label never placed")]
+    pub span: SourceSpan,
+
+    /// The source file content (miette prints this)
+    #[source_code]
+    pub src: NamedSource
+}
+
+/// The FinishError stores the pre-rendered, pretty error text.
+pub struct FinishError {
+    /// Rendered miette diagnostic(s)
+    pub rendered: String,
+}
+
+impl fmt::Display for FinishError {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { rendered } = self;
+        write!(f, "{rendered}")
+    }
+}
+
+impl fmt::Debug for FinishError {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f)?;
+        fmt::Display::fmt(self, f)
+    }
 }
 
 /// Object file builder
 #[derive(Debug)]
 pub struct Assembler<'a> {
     obj: Object<'a>,
-    pcrel_counter: u32,
     relocs: Vec<(SectionId, Reloc)>,
     curr_section: Option<SectionId>,
+
+    pcrel_counter: u32,
+    lbl_id_counter: LabelId,
+
+    labels          : FxHashMap<LabelId, Label>,
+    unplaced_labels : FxHashMap<LabelId, UnplacedLabelInfo>,
 }
 
 impl<'a> Deref for Assembler<'a> {
@@ -83,7 +145,10 @@ impl<'a> Assembler<'a> {
     ) -> Self {
         let mut asm = Self {
             pcrel_counter: 0,
+            lbl_id_counter: LabelId(0),
             curr_section: None,
+            labels: FxHashMap::default(),
+            unplaced_labels: FxHashMap::default(),
             obj: Object::new(format, arch, endian),
             relocs: Vec::with_capacity(
                 Self::RELOC_PREALLOCATION_COUNT
@@ -117,6 +182,13 @@ impl<'a> Assembler<'a> {
     }
 
     #[must_use]
+    #[inline(always)]
+    pub fn curr_offset(&self) -> u64 {
+        let sid = self.expect_curr_section();
+        self.section(sid).data().len() as _
+    }
+
+    #[must_use]
     #[track_caller]
     #[inline(always)]
     pub const fn expect_curr_section(&self) -> SectionId {
@@ -128,19 +200,248 @@ impl<'a> Assembler<'a> {
         self.obj.flags = flags
     }
 
+    #[must_use]
     #[inline(always)]
     pub fn section_size(&self, section_id: SectionId) -> usize {
         self.obj.section(section_id).data().len()
     }
 
-    #[must_use]
-    #[inline(always)]
-    pub fn finish(mut self) -> Object<'a> {
-        self.resolve_local_relocs();
-        self.resolve_final_relocs();
-        self.obj
+    #[inline]
+    pub fn finish(mut self) -> Result<Object<'a>, FinishError> {
+        if self.unplaced_labels.is_empty() {
+            self.resolve_local_relocs();
+            self.resolve_final_relocs();
+            return Ok(self.obj)
+        }
+
+        Err(self.into_finish_error())
     }
 
+    fn into_finish_error(mut self) -> FinishError {
+        struct DiagnosticRenderer {
+            handler: GraphicalReportHandler,
+        }
+
+        impl DiagnosticRenderer {
+            const RENDERED_PREALLOCATION_SIZE: usize = 512;
+
+            #[inline(always)]
+            fn new() -> Self {
+                Self { handler: GraphicalReportHandler::new() }
+            }
+
+            #[inline]
+            fn render_to_string(&self, diag: &impl Diagnostic) -> String {
+                let mut rendered = String::with_capacity(
+                    Self::RENDERED_PREALLOCATION_SIZE
+                );
+
+                self.handler
+                    .render_report(&mut rendered, diag)
+                    .expect("render_report should not fail");
+
+                rendered
+            }
+        }
+
+        #[inline(always)]
+        const fn byte_offset_from_line_offsets(
+            line_start : usize,
+            line_end   : usize,
+            target_col : usize
+        ) -> usize {
+            let line_len = line_end - line_start;
+            let col0 = b0(target_col, line_len);
+            line_start + col0
+        }
+
+        /// helper: Convert `v` from 1-based to 0-based, clamping the result with `cap`
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # const fn b0(v: usize, cap: usize) -> usize {
+        /// #     let v = v.saturating_sub(1);
+        /// #     if v < cap { v } else { cap }
+        /// # }
+        ///
+        /// assert_eq!(b0(1, 10), 0);   // 1-based 1 -> 0-based 0
+        /// assert_eq!(b0(5, 10), 4);   // 1-based 5 -> 0-based 4
+        /// assert_eq!(b0(0, 10), 0);   // saturating_sub prevents underflow; 0 saturates to 0
+        /// assert_eq!(b0(15, 10), 10); // clamped to cap = 10
+        /// assert_eq!(b0(11, 10), 10); // clamped to cap = 10
+        /// ```
+        const fn b0(v: usize, cap: usize) -> usize {
+            let v = v.saturating_sub(1);
+            if v < cap { v } else { cap }
+        }
+
+        fn calculate_byte_offset_small(text: &str, target_line: usize, target_col: usize) -> usize {
+            if target_line == 0 {
+                return b0(target_col, text.len())
+            }
+
+            let mut curr_line = 0;
+            let mut last_newline_pos = 0;
+
+            let mut newline_iter = Memchr::new(b'\n', text.as_bytes());
+            while let Some(pos) = newline_iter.next() {
+                if curr_line + 1 == target_line {
+                    let line_start = pos + 1;
+                    let line_end = newline_iter.next().unwrap_or(text.len());
+                    return byte_offset_from_line_offsets(
+                        line_start,
+                        line_end,
+                        target_col
+                    )
+                }
+
+                curr_line += 1;
+                last_newline_pos = pos;
+            }
+
+            // target line is beyond the file -> use end of file
+            let final_offset = b0(
+                target_col,
+                text.len() - last_newline_pos
+            );
+
+            last_newline_pos + final_offset
+        }
+
+        fn calculate_byte_offset_large(text: &str, target_line: usize, target_col: usize) -> usize {
+            const FINAL_MEMCHR_THRESHOLD : usize = 1024;
+            const BYTECOUNT_CHUNK_SIZE   : usize = 1024 * 8;
+
+            if target_line == 0 {
+                return b0(target_col, text.len());
+            }
+
+            let text_bytes = text.as_bytes();
+            let mut lines_seen = 0;
+            let mut search_start = 0;
+
+            // pass search_start explicitly to avoid borrow conflict
+            let find_line_end_and_calculate_byte_offset = |last_nl_pos: usize, search_start: usize| {
+                let line_start = search_start + last_nl_pos + 1;
+                let line_end = memchr::memchr(b'\n', &text_bytes[line_start..])
+                    .map(|p| line_start + p)
+                    .unwrap_or(text.len());
+
+                byte_offset_from_line_offsets(line_start, line_end, target_col)
+            };
+
+            while lines_seen < target_line && search_start < text_bytes.len() {
+                let remaining = &text_bytes[search_start..];
+
+                if remaining.len() < FINAL_MEMCHR_THRESHOLD {
+                    let Some(pos) = memchr::memchr(b'\n', remaining) else {
+                        break
+                    };
+
+                    lines_seen += 1;
+
+                    if lines_seen == target_line {
+                        return find_line_end_and_calculate_byte_offset(
+                            pos,
+                            search_start
+                        )
+                    }
+
+                    search_start += pos + 1;
+                } else {
+                    let chunk_end = (search_start + BYTECOUNT_CHUNK_SIZE).min(text_bytes.len());
+                    let chunk = &text_bytes[search_start..chunk_end];
+                    let newlines_in_chunk = bytecount::count(chunk, b'\n');
+
+                    if lines_seen + newlines_in_chunk >= target_line {
+                        let mut local_search = 0;
+                        let mut newline_iter = Memchr::new(b'\n', &chunk[local_search..]);
+                        while let Some(pos) = newline_iter.next() {
+                            lines_seen += 1;
+
+                            if lines_seen == target_line {
+                                return find_line_end_and_calculate_byte_offset(
+                                    local_search + pos,
+                                    search_start
+                                )
+                            }
+
+                            local_search += pos + 1;
+                        }
+
+                        break
+                    } else {
+                        lines_seen += newlines_in_chunk;
+                        search_start = chunk_end;
+                    }
+                }
+            }
+
+            let final_offset = b0(target_col, text.len() - search_start);
+            search_start + final_offset
+        }
+
+        let renderer = DiagnosticRenderer::new();
+
+        let mut file_cache = FxHashMap::<_, Arc<str>>::default();
+
+        let unplaced_labels = mem::take(&mut self.unplaced_labels);
+
+        let reports = unplaced_labels.into_iter().map(|(lbl_id, info)| {
+            let label = self.get_label(lbl_id);
+            let name_bytes = self.get_symbol_name(label.sym);
+            let label_name = str::from_utf8(name_bytes)
+                .unwrap_or("<invalid UTF-8>")
+                .to_owned();
+
+            let file = info.caller_loc.file().to_owned();
+
+            let content = file_cache.entry(file.to_owned()).or_insert_with(|| {
+                fs::read_to_string(&file).unwrap_or_default().into()
+            });
+
+            let (named_src, span) = if !content.is_empty() {
+                let l = info.caller_loc.line()   as usize;
+                let c = info.caller_loc.column() as usize;
+
+                const CONTENT_SIZE_THRESHOLD: usize = 10 * 1024;
+
+                let byte_offset = if content.len() < CONTENT_SIZE_THRESHOLD {
+                    calculate_byte_offset_small(content, l - 1, c)
+                } else {
+                    calculate_byte_offset_large(content, l - 1, c)
+                };
+
+                let highlight_len = label_name.len().max(1);
+
+                (
+                    NamedSource::new(file, Arc::clone(&content)),
+                    SourceSpan::new(byte_offset.into(), highlight_len.into()),
+                )
+            } else {
+                (
+                    NamedSource::new(file, ""),
+                    SourceSpan::new(0.into(), 0.into())
+                )
+            };
+
+            let diag = UnplacedLabelDiagnostic {
+                span,
+                src: named_src,
+                name: label_name
+            };
+
+            renderer.render_to_string(&diag)
+        }).collect::<Vec<_>>();
+
+        FinishError {
+            // join multiple diagnostics with a blank line between them
+            rendered: reports.join("\n\n")
+        }
+    }
+
+    #[must_use]
     #[inline(always)]
     pub fn next_pcrel_label(
         &mut self,
@@ -160,10 +461,16 @@ impl<'a> Assembler<'a> {
         l
     }
 
+    #[must_use]
+    #[inline(always)]
+    pub fn next_brik_lbl_id(&mut self) -> LabelId {
+        let id = self.lbl_id_counter;
+        self.lbl_id_counter.0 += 1;
+        id
+    }
+
     #[inline]
-    pub fn new_label(&mut self, name: &[u8]) -> Label {
-        let section_id = self.expect_curr_section();
-        let offset = self.section_size(section_id) as _;
+    fn add_label_(&mut self, name: &[u8], offset: u64) -> Label {
         let sym = self.add_symbol(
             name,
             offset,
@@ -173,6 +480,27 @@ impl<'a> Assembler<'a> {
         );
 
         Label { sym }
+    }
+
+    #[inline]
+    pub fn add_label_here(&mut self, name: &[u8]) -> LabelId {
+        let curr_offset = self.curr_offset();
+        let l = self.add_label_(name, curr_offset);
+        let id = self.next_brik_lbl_id();
+        self.labels.insert(id, l);
+        id
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn declare_label(&mut self, name: &[u8]) -> LabelId {
+        let l = self.add_label_(name, 0);
+        let id = self.next_brik_lbl_id();
+        self.labels.insert(id, l);
+        self.unplaced_labels.insert(id, UnplacedLabelInfo {
+            caller_loc: panic::Location::caller()
+        });
+        id
     }
 
     #[inline]
@@ -366,7 +694,7 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline(always)]
-    pub fn emit_branch_to(&mut self, i: asm_riscv::I, label: Label) {
+    pub fn emit_branch_to(&mut self, lbl_id: LabelId, i: asm_riscv::I) {
         let section_id = self.expect_curr_section();
         let offset = self.emit_bytes(i);
 
@@ -382,19 +710,49 @@ impl<'a> Assembler<'a> {
             section_id,
             Reloc {
                 offset,
-                symbol: label.sym,
+                symbol: self.get_label(lbl_id).sym,
                 rtype,
                 addend: 0,
             }
         ));
     }
 
+    #[must_use]
+    #[inline(always)]
+    pub fn get_symbol_name(&self, sym: SymbolId) -> &[u8] {
+        &self.symbol(sym).name
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn get_label(&self, lbl_id: LabelId) -> &Label {
+        &self.labels[&lbl_id]
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn get_label_mut(&mut self, lbl_id: LabelId) -> &mut Label {
+        self.labels.get_mut(&lbl_id).unwrap()
+    }
+
+    #[inline(always)]
+    pub fn try_remove_from_unplaced(&mut self, lbl_id: LabelId) {
+        _ = self.unplaced_labels.remove(&lbl_id)
+    }
+
     #[inline]
-    pub fn patch_label_with_current_offset(&mut self, label: Label) {
-        let section_id = self.expect_curr_section();
-        let offset = self.section_size(section_id) as u64;
+    pub fn place_label_at(&mut self, lbl_id: LabelId, offset: u64) {
+        let label = self.get_label(lbl_id);
         let sym = &mut self.obj.symbol_mut(label.sym);
         sym.value = offset;
+        self.try_remove_from_unplaced(lbl_id);
+    }
+
+    #[inline]
+    pub fn place_label_here(&mut self, lbl_id: LabelId) {
+        let section_id = self.expect_curr_section();
+        let offset = self.section_size(section_id) as u64;
+        self.place_label_at(lbl_id, offset);
     }
 
     #[inline]

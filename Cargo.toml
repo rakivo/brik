@@ -5,9 +5,14 @@ edition = "2024"
 authors = ["Mark Tyrkba <marktyrkba456@gmail.com>"]
 
 [dependencies]
-asm_riscv = { version = "0.2.0",  default-features = false }
-smallvec  = { version = "1.15.1", default-features = false }
-object    = { version = "0.37.2", default-features = false, features = ["write", "elf"] }
+asm_riscv  = { version = "0.2.0",   default-features = false }
+smallvec   = { version = "1.15.1",  default-features = false }
+thiserror  = { version = "1.0",     default-features = false }
+bytecount  = { version = "=0.6.9",  default-features = false }
+memchr     = { version = "=2.7.5",  default-features = false }
+rustc-hash = { version = "2.1.1",   default-features = false, features = ["std"] }
+miette     = { version = "=5",      default-features = false, features = ["fancy"] }
+object     = { version = "=0.37.2", default-features = false, features = ["elf", "write"] }
 
 [[example]]
 name = "basic"
@@ -16,4 +21,9 @@ path = "examples/basic.rs"
 [[example]]
 name = "countdown"
 path = "examples/countdown.rs"
+
+[[example]]
+name = "factorial"
+path = "examples/factorial.rs"
+
 

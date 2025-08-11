@@ -75,7 +75,7 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.emit_pcrel_load_addr(Reg::S1, countdown_sym);
     asm.emit_bytes(rv64::encode_ld(Reg::S1, Reg::S1, 0));
 
-    let loop_lbl = asm.new_label(b".loop");
+    let loop_lbl = asm.add_label_here(b".loop");
 
     // a0 = msg
     asm.emit_pcrel_load_addr(Reg::A0, msg_sym);
@@ -93,11 +93,12 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
 
     // blt 0, s1
     asm.emit_branch_to(
+        loop_lbl,
         I::BLT {
             s1: Reg::ZERO,
             s2: Reg::S1,
             im: 0
-        }, loop_lbl
+        }
     );
 
     asm.emit_function_epilogue();
@@ -106,12 +107,12 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.add_symbol(
         b"main",
         0,
-        asm.section(text_section).data().len() as u64,
+        asm.section_size(text_section) as _,
         SymbolKind::Text,
         SymbolScope::Dynamic,
     );
 
-    asm.finish()
+    asm.finish().unwrap()
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {

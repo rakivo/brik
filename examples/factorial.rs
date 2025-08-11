@@ -111,14 +111,14 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     // init counter in s3 (i = 1)
     asm.emit_bytes(I::ADDI { d: Reg::S3, s: Reg::ZERO, im: 1 });
 
-    let loop_lbl = asm.new_label(b".fact_loop");
-    let done_lbl = asm.new_label(b".fact_done");
+    let loop_lbl = asm.add_label_here(b".fact_loop");
+    let done_lbl = asm.add_label_here(b".fact_done");
 
     // loop condition: if i > n, exit
     asm.emit_branch_to(
+        done_lbl,
         // if s1 < s3 (n < i)
         I::BLT { s1: Reg::S1, s2: Reg::S3, im: 0 },
-        done_lbl
     );
 
     // result *= i
@@ -129,11 +129,11 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
 
     // jump back to loop
     asm.emit_branch_to(
+        loop_lbl,
         I::JAL { d: Reg::ZERO, im: 0 },
-        loop_lbl
     );
 
-    asm.patch_label_with_current_offset(done_lbl);
+    asm.place_label_here(done_lbl);
 
     // print result
     asm.emit_pcrel_load_addr(Reg::A0, result_fmt_sym);
@@ -148,12 +148,12 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.add_symbol(
         b"main",
         0,
-        asm.section(text_section).data().len() as u64,
+        asm.section_size(text_section) as _,
         SymbolKind::Text,
         SymbolScope::Dynamic,
     );
 
-    asm.finish()
+    asm.finish().unwrap()
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
