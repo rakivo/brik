@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use smallvec::SmallVec;
 
+/// Helper trait for converting T to bytes
 pub trait IntoBytes<'a> {
     #[must_use]
     fn into_bytes(self) -> Cow<'a, [u8]>;

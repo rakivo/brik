@@ -1,3 +1,5 @@
+//! Opcode-like things: RV64Opcode, AqRl enums
+
 /// RISC-V RV64I and M-extension opcodes for instruction encoding.
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq)]

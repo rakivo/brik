@@ -1,3 +1,5 @@
+//! Util things like helper functions/traits/macros, RV64 extensions, opcodes, diagnostics stuff
+
 #[macro_use]
 pub mod misc;
 pub mod rv64;

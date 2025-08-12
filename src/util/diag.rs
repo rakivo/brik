@@ -1,9 +1,11 @@
+//! Diagnostic helpers
+
 use crate::util::misc;
 
 use std::sync::Arc;
 
-use thiserror::Error;
 use memchr::Memchr;
+use thiserror::Error;
 use miette::{
     Diagnostic,
     SourceSpan,
@@ -11,6 +13,7 @@ use miette::{
     GraphicalReportHandler,
 };
 
+/// `miette` diagnostic struct for rendering errors of unplaced labels
 #[derive(Debug, Error, Diagnostic)]
 #[error("unplaced label '{name}'")]
 pub struct UnplacedLabelDiagnostic {
@@ -67,7 +70,7 @@ const fn byte_offset_from_line_offsets(
 }
 
 #[inline]
-pub fn text_into_named_source_and_source_span(
+pub fn text_into_named_source_and_span(
     text      : impl Into<Arc<str>>,
     file_path : impl AsRef<str>,
 

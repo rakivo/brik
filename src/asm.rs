@@ -280,7 +280,7 @@ impl<'a> Assembler<'a> {
                 fs::read_to_string(file_path).unwrap_or_default().into()
             });
 
-            let (named_src, span) = diag::text_into_named_source_and_source_span(
+            let (named_src, span) = diag::text_into_named_source_and_span(
                 Arc::clone(content),
                 file_path,
                 info.caller_loc.line() as _,

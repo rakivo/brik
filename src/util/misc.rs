@@ -1,4 +1,6 @@
-/// helper: Convert `v` from 1-based to 0-based, clamping the result with `cap`
+//! Helper functions and macros
+
+/// Convert `v` from 1-based to 0-based, clamping the result with `cap`
 ///
 /// # Examples
 ///
@@ -19,6 +21,7 @@ pub const fn b0(v: usize, cap: usize) -> usize {
     if v < cap { v } else { cap }
 }
 
+// Check if T fits into 12-bits integer (i12)
 #[inline(always)]
 pub fn fits_into_12_bits<T: TryInto<i16>>(v: T) -> bool {
     const BOUND: i16 = 1 << (12 - 1);
@@ -29,8 +32,7 @@ pub fn fits_into_12_bits<T: TryInto<i16>>(v: T) -> bool {
     }
 }
 
-/// Macro that generates a Debug implementation that formats the same as Display
-/// with an optional newline prefix
+#[doc(hidden)]
 macro_rules! debug_from_display {
     ($type: ty, newline) => {
         const _: fn() = || {
@@ -62,6 +64,7 @@ macro_rules! debug_from_display {
     };
 }
 
+#[doc(hidden)]
 macro_rules! with_at_end {
     (
         $(#[$meta:meta])*

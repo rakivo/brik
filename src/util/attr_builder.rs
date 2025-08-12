@@ -1,5 +1,6 @@
 //! Attribute builder for metadata sections (i.e. ".riscv.attributes")
 
+/// Attribute builder for metadata sections (i.e. ".riscv.attributes")
 #[derive(Debug)]
 pub struct RiscvAttrsBuilder {
     vendor: Vec<u8>,
