@@ -19,6 +19,16 @@ pub const fn b0(v: usize, cap: usize) -> usize {
     if v < cap { v } else { cap }
 }
 
+#[inline(always)]
+pub fn fits_into_12_bits<T: TryInto<i16>>(v: T) -> bool {
+    const BOUND: i16 = 1 << (12 - 1);
+
+    matches!{
+        v.try_into(),
+        Ok(v) if v > -BOUND && v < BOUND
+    }
+}
+
 /// Macro that generates a Debug implementation that formats the same as Display
 /// with an optional newline prefix
 macro_rules! debug_from_display {
