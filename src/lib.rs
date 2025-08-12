@@ -1,5 +1,4 @@
 // TODO(#1): Implement tests
-// TODO(#3): Complete coverage of M-extension: (MUL, DIV, REM, etc)
 // TODO(#5): Implement A-extension: (LR, SC, AMO, etc)
 // TODO(#2): Implement F/D-extension: (single/double precision)
 // TODO(#4): Implement C-extension: (compressed instructions (16-bit))
