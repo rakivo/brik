@@ -812,10 +812,7 @@ impl<'a> Assembler<'a> {
             section,
             (target_sym, RelocKind::CallPlt),
         );
-        self.emit_bytes_at(
-            I::JALR { d: Reg::RA, s: Reg::T0, im: 0 },
-            section,
-        );
+        self.emit_jalr(Reg::RA, Reg::T0, 0);
     }
 
     #[inline(always)]
@@ -831,10 +828,7 @@ impl<'a> Assembler<'a> {
             section,
             (sym, RelocKind::Call),
         );
-        self.emit_bytes_at(
-            I::JALR { d: Reg::RA, s: Reg::T0, im: 0 },
-            section,
-        );
+        self.emit_jalr(Reg::RA, Reg::T0, 0);
     }
 
     #[inline]
@@ -847,10 +841,7 @@ impl<'a> Assembler<'a> {
     pub fn emit_return_imm_at(&mut self, section: SectionId, imm: i64) {
         let bytes = rv64::encode_li_rv64_little(Reg::A0, imm);
         self.emit_bytes_at(bytes, section);
-        self.emit_bytes_at(
-            I::JALR { d: Reg::ZERO, s: Reg::RA, im: 0 },
-            section
-        );
+        self.emit_ret();
     }
 
     #[inline(always)]
@@ -1025,13 +1016,11 @@ impl<'a> Assembler<'a> {
 
     // === JUMP OPERATIONS ===
 
-    /// Jump and link to label
     #[inline(always)]
     pub fn emit_jal(&mut self, rd: Reg, label: LabelId) {
         self.emit_branch_to(label, I::JAL { d: rd, im: 0 });
     }
 
-    /// Jump and link register
     #[inline(always)]
     pub fn emit_jalr(&mut self, rd: Reg, rs1: Reg, offset: i16) {
         self.emit_bytes(I::JALR { d: rd, s: rs1, im: offset });
@@ -1073,4 +1062,3 @@ impl<'a> Assembler<'a> {
         self.emit_addi(Reg::SP, Reg::SP, 8);
     }
 }
-

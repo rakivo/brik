@@ -3,7 +3,6 @@ use crate::util::misc;
 use std::sync::Arc;
 
 use thiserror::Error;
-
 use memchr::Memchr;
 use miette::{
     Diagnostic,

@@ -1,11 +1,11 @@
 //! RV64 extension for asm_riscv (RV32)
 
-use std::mem;
-
+use crate::asm_riscv::{I, Reg};
 use crate::util::into_bytes::IntoBytes;
 
+use std::mem;
+
 use smallvec::SmallVec;
-use asm_riscv::{I, Reg};
 
 pub type RV64Bytes = SmallVec<[u8; mem::size_of::<u32>() * 3]>;
 
@@ -57,7 +57,7 @@ pub const fn encode_sd(rs2: Reg, rs1: Reg, imm: i16) -> u32 {
         | 0x23                 // opcode = 0x23 for STORE
 }
 
-/// Encode RISC-V MUL (Multiplication) instruction.
+/// Encode RISC-V MUL (M-extension) instruction.
 ///
 /// # Example
 /// ```
@@ -123,28 +123,39 @@ pub fn encode_li_rv64_little(rd: Reg, imm: i64) -> RV64Bytes {
 /// use brik::asm_riscv::Reg;
 /// use brik::util::rv64::encode_addw;
 /// let inst = encode_addw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0xc5853b);
 /// // addw a0, a1, a2
 /// ```
 #[inline(always)]
 pub const fn encode_addw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
-    ((rs2 as u32) << 20)       // rs2
-        | ((rs1 as u32) << 15) // rs1
-        | (0 << 12)            // funct3 = 0 for ADDW
-        | ((rd as u32) << 7)   // rd
-        | (0 << 25)            // funct7 = 0000000 for ADDW
-        | 0x3B                 // opcode = 0x3B for OP-32
+    // opcode 0x3B, funct3 = 0, funct7 = 0
+    ((rs2 as u32) << 20)
+        | ((rs1 as u32) << 15)
+        | (0 << 12)            // funct3 = 0
+        | ((rd as u32) << 7)
+        | (0 << 25)            // funct7 = 0
+        | 0x3B                 // opcode
 }
 
 /// Encode RISC-V SUBW (Subtract Word) instruction - RV64 only.
 /// Performs 32-bit subtraction and sign-extends the result to 64 bits.
+///
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_subw;
+/// assert_eq!(encode_subw(Reg::A0, Reg::A1, Reg::A2), 0x40c5853b);
+/// ```
 #[inline(always)]
 pub const fn encode_subw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
-    ((rs2 as u32) << 20)       // rs2
-        | ((rs1 as u32) << 15) // rs1
-        | (0 << 12)            // funct3 = 0 for SUBW
-        | ((rd as u32) << 7)   // rd
-        | (0x20 << 25)         // funct7 = 0100000 for SUBW
-        | 0x3B                 // opcode = 0x3B for OP-32
+    // opcode 0x3B, funct3 = 0, funct7 = 0x20
+    ((rs2 as u32) << 20)
+        | ((rs1 as u32) << 15)
+        | (0 << 12)
+        | ((rd as u32) << 7)
+        | (0x20 << 25)         // funct7 = 0b0100000
+        | 0x3B
 }
 
 /// Encode RISC-V ADDIW (Add Immediate Word) instruction - RV64 only.
@@ -155,20 +166,29 @@ pub const fn encode_subw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// use brik::asm_riscv::Reg;
 /// use brik::util::rv64::encode_addiw;
 /// let inst = encode_addiw(Reg::A0, Reg::A1, 42);
+/// assert_eq!(inst, 0x2a5851b);
 /// // addiw a0, a1, 42
 /// ```
 #[inline(always)]
 pub const fn encode_addiw(rd: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12 = (imm as u32) & 0xfff;
-    (imm12 << 20)              // imm[11:0]
-        | ((rs1 as u32) << 15) // rs1
-        | (0 << 12)            // funct3 = 0 for ADDIW
-        | ((rd as u32) << 7)   // rd
-        | 0x1B                 // opcode = 0x1B for OP-IMM-32
+    (imm12 << 20)
+        | ((rs1 as u32) << 15)
+        | (0 << 12)            // funct3 = 0
+        | ((rd as u32) << 7)
+        | 0x1B                 // opcode = 0x1B
 }
 
 /// Encode RISC-V SLLW (Shift Left Logical Word) instruction - RV64 only.
 /// Performs 32-bit left shift and sign-extends the result.
+///
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_sllw;
+/// assert_eq!(encode_sllw(Reg::A0, Reg::A1, Reg::A2), 0xc5953b);
+/// ```
 #[inline(always)]
 pub const fn encode_sllw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     ((rs2 as u32) << 20)       // rs2 (shift amount in lower 5 bits)
@@ -181,6 +201,14 @@ pub const fn encode_sllw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 
 /// Encode RISC-V SRLW (Shift Right Logical Word) instruction - RV64 only.
 /// Performs 32-bit logical right shift and sign-extends the result.
+///
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_srlw;
+/// assert_eq!(encode_srlw(Reg::A0, Reg::A1, Reg::A2), 0xc5d53b);
+/// ```
 #[inline(always)]
 pub const fn encode_srlw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     ((rs2 as u32) << 20)       // rs2 (shift amount in lower 5 bits)
@@ -193,6 +221,14 @@ pub const fn encode_srlw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 
 /// Encode RISC-V SRAW (Shift Right Arithmetic Word) instruction - RV64 only.
 /// Performs 32-bit arithmetic right shift and sign-extends the result.
+///
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_sraw;
+/// assert_eq!(encode_sraw(Reg::A0, Reg::A1, Reg::A2), 0x40c5d53b);
+/// ```
 #[inline(always)]
 pub const fn encode_sraw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     ((rs2 as u32) << 20)       // rs2 (shift amount in lower 5 bits)
@@ -203,88 +239,118 @@ pub const fn encode_sraw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
         | 0x3B                 // opcode = 0x3B for OP-32
 }
 
-/// Encode RISC-V SLLIW (Shift Left Logical Immediate Word) instruction - RV64 only.
-/// Performs 32-bit left shift by immediate and sign-extends the result.
-///
+#[inline(always)]
+const fn const_32_shamt_constains_(shamt: i8) -> bool {
+    shamt > 0 && shamt < 32
+}
+
 /// # Example
-/// ```
+///
+/// ```rust
 /// use brik::asm_riscv::Reg;
 /// use brik::util::rv64::encode_slliw;
-/// let inst = encode_slliw(Reg::A0, Reg::A1, 4);
-/// // slliw a0, a1, 4
+/// assert_eq!(encode_slliw(Reg::A0, Reg::A1, 4), 0x45951b);
 /// ```
 #[inline(always)]
 pub const fn encode_slliw(rd: Reg, rs1: Reg, shamt: i8) -> u32 {
-    debug_assert!(shamt < 32, "SLLIW shift amount must be < 32");
-    ((shamt as u32) << 20)     // shamt[4:0] in imm[11:0] field
-        | ((rs1 as u32) << 15) // rs1
-        | (1 << 12)            // funct3 = 1 for SLLIW
-        | ((rd as u32) << 7)   // rd
-        | 0x1B                 // opcode = 0x1B for OP-IMM-32
+    debug_assert!(const_32_shamt_constains_(shamt), "slliw shamt must be <32");
+    let sh = (shamt as u32) & 0x1f;
+    // imm[11:0] carries funct7 in [11:5] and shamt in [4:0] but for SLLIW funct7=0
+    ((sh) << 20)             // shamt -> bits 24:20
+        | ((rs1 as u32) << 15)
+        | (1 << 12)          // funct3 = 1
+        | ((rd as u32) << 7)
+        | 0x1B
 }
 
-/// Encode RISC-V SRLIW (Shift Right Logical Immediate Word) instruction - RV64 only.
-/// Performs 32-bit logical right shift by immediate and sign-extends the result.
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_srliw;
+/// assert_eq!(encode_srliw(Reg::A0, Reg::A1, 4), 0x45d51b);
+/// ```
 #[inline(always)]
 pub const fn encode_srliw(rd: Reg, rs1: Reg, shamt: i8) -> u32 {
-    debug_assert!(shamt < 32, "SRLIW shift amount must be < 32");
-    ((shamt as u32) << 20)     // shamt[4:0] in imm[11:0] field
-        | ((rs1 as u32) << 15) // rs1
-        | (5 << 12)            // funct3 = 5 for SRLIW
-        | ((rd as u32) << 7)   // rd
-        | 0x1B                 // opcode = 0x1B for OP-IMM-32
+    debug_assert!(const_32_shamt_constains_(shamt), "srliw shamt must be <32");
+    let sh = (shamt as u32) & 0x1f;
+    ((sh) << 20)             // shamt -> bits 24:20, funct7=0 for SRLIW
+        | ((rs1 as u32) << 15)
+        | (5 << 12)          // funct3 = 5
+        | ((rd as u32) << 7)
+        | 0x1B
 }
 
-/// Encode RISC-V SRAIW (Shift Right Arithmetic Immediate Word) instruction - RV64 only.
-/// Performs 32-bit arithmetic right shift by immediate and sign-extends the result.
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_sraiw;
+/// assert_eq!(encode_sraiw(Reg::A0, Reg::A1, 4), 0x4045d51b);
+/// ```
 #[inline(always)]
 pub const fn encode_sraiw(rd: Reg, rs1: Reg, shamt: i8) -> u32 {
-    debug_assert!(shamt < 32, "SRAIW shift amount must be < 32");
-    ((0x20 << 5) | (shamt as u32)) << 20  // funct7=0100000, shamt[4:0]
-        | ((rs1 as u32) << 15) // rs1
-        | (5 << 12)            // funct3 = 5 for SRAIW
-        | ((rd as u32) << 7)   // rd
-        | 0x1B                 // opcode = 0x1B for OP-IMM-32
+    debug_assert!(const_32_shamt_constains_(shamt), "sraiw shamt must be <32");
+    let sh = (shamt as u32) & 0x1f;
+    // funct7=0x20 in bits 31:25 and shamt in 24:20
+    ((0x20 << 5 | sh) << 20) // combine funct7 <<5 | shamt -> then <<20 places into bits 31:20
+        | ((rs1 as u32) << 15)
+        | (5 << 12)          // funct3 = 5
+        | ((rd as u32) << 7)
+        | 0x1B
 }
 
-// =============================================================================
-// Additional useful 64-bit operations
-// =============================================================================
+// ---------------- Loads (unsigned variants) ----------------
 
-/// Encode RISC-V LWU (Load Word Unsigned) instruction - RV64 only.
-/// Loads 32 bits and zero-extends to 64 bits (no sign extension).
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_lwu;
+/// assert_eq!(encode_lwu(Reg::A0, Reg::SP, 0), 0x16503);
+/// ```
 #[inline(always)]
 pub const fn encode_lwu(rd: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12 = (imm as u32) & 0xfff;
-    (imm12 << 20)              // imm[11:0]
-        | ((rs1 as u32) << 15) // rs1
-        | (6 << 12)            // funct3 = 6 for LWU (32-bit unsigned load)
-        | ((rd as u32) << 7)   // rd
-        | 0x03                 // opcode = 0x03 for LOAD
+    (imm12 << 20)
+        | ((rs1 as u32) << 15)
+        | (6 << 12)            // funct3 = 6 for LWU
+        | ((rd as u32) << 7)
+        | 0x03
 }
 
-/// Encode RISC-V LHU (Load Halfword Unsigned) instruction.
-/// Loads 16 bits and zero-extends to register width.
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_lhu;
+/// assert_eq!(encode_lhu(Reg::A0, Reg::SP, 0), 0x15503);
+/// ```
 #[inline(always)]
 pub const fn encode_lhu(rd: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12 = (imm as u32) & 0xfff;
-    (imm12 << 20)              // imm[11:0]
-        | ((rs1 as u32) << 15) // rs1
-        | (5 << 12)            // funct3 = 5 for LHU (16-bit unsigned load)
-        | ((rd as u32) << 7)   // rd
-        | 0x03                 // opcode = 0x03 for LOAD
+    (imm12 << 20)
+        | ((rs1 as u32) << 15)
+        | (5 << 12)            // funct3 = 5 for LHU
+        | ((rd as u32) << 7)
+        | 0x03
 }
 
-/// Encode RISC-V LBU (Load Byte Unsigned) instruction.
-/// Loads 8 bits and zero-extends to register width.
+/// # Example
+///
+/// ```rust
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_lbu;
+/// assert_eq!(encode_lbu(Reg::A0, Reg::SP, 0), 0x14503);
+/// ```
 #[inline(always)]
 pub const fn encode_lbu(rd: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12 = (imm as u32) & 0xfff;
-    (imm12 << 20)              // imm[11:0]
-        | ((rs1 as u32) << 15) // rs1
-        | (4 << 12)            // funct3 = 4 for LBU (8-bit unsigned load)
-        | ((rd as u32) << 7)   // rd
-        | 0x03                 // opcode = 0x03 for LOAD
+    (imm12 << 20)
+        | ((rs1 as u32) << 15)
+        | (4 << 12)            // funct3 = 4 for LBU
+        | ((rd as u32) << 7)
+        | 0x03
 }
 
 #[cfg(test)]
@@ -293,32 +359,21 @@ mod tests {
 
     #[test]
     fn test_negative_immediate_ld() {
-        // Test that negative immediates work correctly
+        // test that negative immediates work correctly
         let inst = encode_ld(Reg::A0, Reg::SP, -8);
-        // Should encode -8 correctly in the immediate field
-        assert_eq!(inst & 0xfff00000, 0xff800000); // Upper bits should be set for -8
+        // should encode -8 correctly in the immediate field
+        assert_eq!(inst & 0xfff00000, 0xff800000); // upper bits should be set for -8
     }
 
     #[test]
     fn test_negative_immediate_sd() {
-        // Test that negative immediates work correctly for SD too
+        // test that negative immediates work correctly for SD too
         let inst = encode_sd(Reg::A0, Reg::SP, -8);
-        // For S-type, immediate is split but should still represent -8
+        // for S-type, immediate is split but should still represent -8
         let imm_high = (inst >> 25) & 0x7f;
-        let imm_low = (inst >> 7) & 0x1f;
+        let imm_low  = (inst >>  7) & 0x1f;
         let reconstructed_imm = ((imm_high << 5) | imm_low) as i16;
-        // Due to 2's complement, this should reconstruct to -8
-        assert_eq!((reconstructed_imm << 4) >> 4, -8); // Sign extend from 12-bit
-    }
-
-    #[test]
-    fn test_addw_encoding() {
-        let inst = encode_addw(Reg::A0, Reg::A1, Reg::A2);
-        // Check opcode is 0x3B
-        assert_eq!(inst & 0x7f, 0x3b);
-        // Check funct3 is 0
-        assert_eq!((inst >> 12) & 0x7, 0);
-        // Check funct7 is 0
-        assert_eq!((inst >> 25) & 0x7f, 0);
+        // due to 2's complement, this should reconstruct to -8
+        assert_eq!((reconstructed_imm << 4) >> 4, -8); // sext from 12-bit
     }
 }
