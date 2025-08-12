@@ -95,25 +95,6 @@ pub const fn encode_sd(rs2: Reg, rs1: Reg, imm: i16) -> u32 {
         | Store.as_u32()
 }
 
-/// Encode RISC-V MUL (M-extension) instruction.
-///
-/// # Example
-/// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mul;
-/// let inst = encode_mul(Reg::A0, Reg::A1, Reg::A2);
-/// assert_eq!(inst, 0x02c58533); // mul a0, a1, a2
-/// ```
-#[inline(always)]
-pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
-    (0x01 << 25)               // funct7 = 0x01
-        | ((rs2 as u32) << 20) // multiplier
-        | ((rs1 as u32) << 15) // multiplicand
-        | (0x0 << 12)          // funct3 = 0x0 for mul
-        | ((rd as u32) << 7)   // dest
-        | Op.as_u32()
-}
-
 /// Expand `li rd, imm` for RV64 and return its encoding as little-endian bytes.
 ///
 /// # Example
@@ -162,6 +143,327 @@ pub fn encode_li_rv64_little(rd: Reg, imm: i64) -> RV64Inst {
     bytes.extend_from_slice(&lo_inst.into_bytes());
 
     bytes
+}
+
+// =============================================================================
+// (M-extension) instructions (Version 2.1)
+// =============================================================================
+
+/// Encode RISC-V DIV (M-extension) instruction.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_div;
+/// let inst = encode_div(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02c5c533); // div a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_div(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0x01
+        | ((rs2 as u32) << 20) // divisor
+        | ((rs1 as u32) << 15) // dividend
+        | (0x4 << 12)          // funct3 = 0x4 for div
+        | ((rd as u32) << 7)   // dest
+        | Op.as_u32()
+}
+
+// Encode RISC-V DIVW (M-extension) instruction.
+/// Performs 32-bit signed division, sign-extends quotient to 64 bits.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_divw;
+/// let inst = encode_divw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5C53B); // divw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_divw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (divisor)
+        | ((rs1 as u32) << 15) // rs1 (dividend)
+        | (0x4 << 12)          // funct3 = 100 for DIVW
+        | ((rd as u32) << 7)   // rd (destination, quotient)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V DIVU (M-extension) instruction.
+/// Performs 64-bit unsigned division and stores the quotient in rd.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_divu;
+/// let inst = encode_divu(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5D533); // divu a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_divu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001 for M-extension
+        | ((rs2 as u32) << 20) // rs2 (divisor)
+        | ((rs1 as u32) << 15) // rs1 (dividend)
+        | (0x5 << 12)          // funct3 = 101 for DIVU
+        | ((rd as u32) << 7)   // rd (destination, quotient)
+        | Op.as_u32()          // opcode = 0x33 for OP
+}
+
+/// Encode RISC-V DIVUW (M-extension) instruction.
+/// Performs 32-bit unsigned division and sign-extends the quotient to 64 bits (RV64 only).
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_divuw;
+/// let inst = encode_divuw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5D53B); // divuw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_divuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001 for M-extension
+        | ((rs2 as u32) << 20) // rs2 (divisor)
+        | ((rs1 as u32) << 15) // rs1 (dividend)
+        | (0x5 << 12)          // funct3 = 101 for DIVUW
+        | ((rd as u32) << 7)   // rd (destination, quotient)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V REM (M-extension) instruction.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_rem;
+/// let inst = encode_rem(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02c5e533); // rem a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_rem(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0x01
+        | ((rs2 as u32) << 20) // divisor
+        | ((rs1 as u32) << 15) // dividend
+        | (0x6 << 12)          // funct3 = 0x6 for rem
+        | ((rd as u32) << 7)   // dest
+        | Op.as_u32()
+}
+
+/// Encode RISC-V REMW (M-extension) instruction.
+/// Performs 32-bit signed division, sign-extends remainder to 64 bits.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_remw;
+/// let inst = encode_remw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5E53B); // remw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_remw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (divisor)
+        | ((rs1 as u32) << 15) // rs1 (dividend)
+        | (0x6 << 12)          // funct3 = 110 for REMW
+        | ((rd as u32) << 7)   // rd (destination, remainder)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V REMU (M-extension) instruction.
+/// Performs 64-bit unsigned division and stores the remainder in rd.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_remu;
+/// let inst = encode_remu(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5F533); // remu a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_remu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001 for M-extension
+        | ((rs2 as u32) << 20) // rs2 (divisor)
+        | ((rs1 as u32) << 15) // rs1 (dividend)
+        | (0x7 << 12)          // funct3 = 111 for REMU
+        | ((rd as u32) << 7)   // rd (destination, remainder)
+        | Op.as_u32()          // opcode = 0x33 for OP
+}
+
+/// Encode RISC-V REMUW (M-extension) instruction.
+/// Performs 32-bit unsigned division and sign-extends the remainder to 64 bits (RV64 only).
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_remuw;
+/// let inst = encode_remuw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5F53B); // remuw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_remuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001 for M-extension
+        | ((rs2 as u32) << 20) // rs2 (divisor)
+        | ((rs1 as u32) << 15) // rs1 (dividend)
+        | (0x7 << 12)          // funct3 = 111 for REMUW
+        | ((rd as u32) << 7)   // rd (destination, remainder)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V MUL (M-extension) instruction.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mul;
+/// let inst = encode_mul(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02c58533); // mul a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0x01
+        | ((rs2 as u32) << 20) // multiplier
+        | ((rs1 as u32) << 15) // multiplicand
+        | (0x0 << 12)          // funct3 = 0x0 for mul
+        | ((rd as u32) << 7)   // dest
+        | Op.as_u32()
+}
+
+/// Encode RISC-V MULW (M-extension) instruction.
+/// Performs 32-bit signed multiplication and sign-extends the result to 64 bits (RV64 only).
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulw;
+/// let inst = encode_mulw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5853B); // mulw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001 for M-extension
+        | ((rs2 as u32) << 20) // rs2 (multiplier)
+        | ((rs1 as u32) << 15) // rs1 (multiplicand)
+        | (0x0 << 12)          // funct3 = 000 for MULW
+        | ((rd as u32) << 7)   // rd (destination, product)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V MULHW (M-extension) instruction.
+/// Performs 32-bit signed × signed multiplication, sign-extends upper 32 bits to 64 bits.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulhw;
+/// let inst = encode_mulhw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5953B); // mulhw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulhw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (multiplier)
+        | ((rs1 as u32) << 15) // rs1 (multiplicand)
+        | (0x1 << 12)          // funct3 = 001 for MULHW
+        | ((rd as u32) << 7)   // rd (destination, upper product)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V MULHSUW (M-extension) instruction.
+/// Performs 32-bit signed × unsigned multiplication, sign-extends upper 32 bits to 64 bits.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulhsuw;
+/// let inst = encode_mulhsuw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5A53B); // mulhsuw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulhsuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (unsigned multiplier)
+        | ((rs1 as u32) << 15) // rs1 (signed multiplicand)
+        | (0x2 << 12)          // funct3 = 010 for MULHSUW
+        | ((rd as u32) << 7)   // rd (destination, upper product)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V MULHUW (M-extension) instruction.
+/// Performs 32-bit unsigned × unsigned multiplication, sign-extends upper 32 bits to 64 bits.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulhuw;
+/// let inst = encode_mulhuw(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5B53B); // mulhuw a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulhuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (unsigned multiplier)
+        | ((rs1 as u32) << 15) // rs1 (unsigned multiplicand)
+        | (0x3 << 12)          // funct3 = 011 for MULHUW
+        | ((rd as u32) << 7)   // rd (destination, upper product)
+        | Op32.as_u32()        // opcode = 0x3B for OP-32
+}
+
+/// Encode RISC-V MULH (M-extension) instruction.
+/// Performs 64-bit signed × signed multiplication, stores upper 64 bits in rd.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulh;
+/// let inst = encode_mulh(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C59533); // mulh a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulh(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (multiplier)
+        | ((rs1 as u32) << 15) // rs1 (multiplicand)
+        | (0x1 << 12)          // funct3 = 001 for MULH
+        | ((rd as u32) << 7)   // rd (destination, upper product)
+        | Op.as_u32()          // opcode = 0x33 for OP
+}
+
+/// Encode RISC-V MULHSU (M-extension) instruction.
+/// Performs 64-bit signed × unsigned multiplication, stores upper 64 bits in rd.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulhsu;
+/// let inst = encode_mulhsu(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5A533); // mulhsu a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulhsu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (unsigned multiplier)
+        | ((rs1 as u32) << 15) // rs1 (signed multiplicand)
+        | (0x2 << 12)          // funct3 = 010 for MULHSU
+        | ((rd as u32) << 7)   // rd (destination, upper product)
+        | Op.as_u32()          // opcode = 0x33 for OP
+}
+
+/// Encode RISC-V MULHU (M-extension) instruction.
+/// Performs 64-bit unsigned × unsigned multiplication, stores upper 64 bits in rd.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::rv64::encode_mulhu;
+/// let inst = encode_mulhu(Reg::A0, Reg::A1, Reg::A2);
+/// assert_eq!(inst, 0x02C5B533); // mulhu a0, a1, a2
+/// ```
+#[inline(always)]
+pub const fn encode_mulhu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
+    (0x01 << 25)               // funct7 = 0000001
+        | ((rs2 as u32) << 20) // rs2 (unsigned multiplier)
+        | ((rs1 as u32) << 15) // rs1 (unsigned multiplicand)
+        | (0x3 << 12)          // funct3 = 011 for MULHU
+        | ((rd as u32) << 7)   // rd (destination, upper product)
+        | Op.as_u32()          // opcode = 0x33 for OP
 }
 
 // =============================================================================
