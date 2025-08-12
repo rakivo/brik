@@ -144,42 +144,7 @@ impl<'a> Assembler<'a> {
         asm
     }
 
-    #[inline(always)]
-    pub const fn position_at_end(&mut self, section: SectionId) {
-        self.curr_section = Some(section)
-    }
-
-    #[must_use]
-    #[inline(always)]
-    pub const fn curr_section(&self) -> Option<SectionId> {
-        self.curr_section
-    }
-
-    #[must_use]
-    #[inline(always)]
-    pub fn curr_offset(&self) -> u64 {
-        let sid = self.expect_curr_section();
-        self.section(sid).data().len() as _
-    }
-
-    #[must_use]
-    #[track_caller]
-    #[inline(always)]
-    pub const fn expect_curr_section(&self) -> SectionId {
-        self.curr_section.expect("no current section set")
-    }
-
-    #[inline(always)]
-    pub const fn set_object_flags(&mut self, flags: FileFlags) {
-        self.obj.flags = flags
-    }
-
-    #[must_use]
-    #[inline(always)]
-    pub fn section_size(&self, section_id: SectionId) -> usize {
-        self.obj.section(section_id).data().len()
-    }
-
+    /// Finish object emission
     #[inline]
     pub fn finish(mut self) -> Result<Object<'a>, FinishError> {
         if self.unplaced_labels.is_empty() {
@@ -190,6 +155,110 @@ impl<'a> Assembler<'a> {
 
         Err(self.into_finish_error())
     }
+
+    #[inline(always)]
+    pub const fn position_at_end(&mut self, section: SectionId) {
+        self.curr_section = Some(section)
+    }
+
+    #[inline(always)]
+    pub const fn set_object_flags(&mut self, flags: FileFlags) {
+        self.obj.flags = flags
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn curr_offset(&self) -> u64 {
+        let sid = self.expect_curr_section();
+        self.section_size(sid)
+    }
+
+    // ----- SECTION MANAGEMENT -----
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn curr_section(&self) -> Option<SectionId> {
+        self.curr_section
+    }
+
+    #[must_use]
+    #[track_caller]
+    #[inline(always)]
+    pub const fn expect_curr_section(&self) -> SectionId {
+        self.curr_section().expect("no current section set")
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn section_size(&self, section_id: SectionId) -> u64 {
+        self.obj.section(section_id).data().len() as _
+    }
+
+    with_at_end!{
+        /// Add a text section
+        #[inline(always)]
+        pub fn add_text_section(&mut self, name: &[u8]) -> SectionId {
+            self.add_section(
+                StandardSegment::Text,
+                name,
+                SectionKind::Text,
+            )
+        }
+    }
+
+    with_at_end!{
+        /// Add a data section
+        #[inline]
+        pub fn add_data_section(&mut self, name: &[u8]) -> SectionId {
+            self.add_section(
+                StandardSegment::Data,
+                name,
+                SectionKind::Data
+            )
+        }
+    }
+
+    with_at_end!{
+        /// Add a read-only data section
+        #[inline]
+        pub fn add_rodata_section(&mut self, name: &[u8]) -> SectionId {
+            self.add_section(
+                StandardSegment::Data,
+                name,
+                SectionKind::ReadOnlyData
+            )
+        }
+    }
+
+    with_at_end!{
+        /// Add a BSS section
+        #[inline]
+        pub fn add_bss_section(&mut self, name: &[u8]) -> SectionId {
+            self.add_section(
+                StandardSegment::Data,
+                name,
+                SectionKind::UninitializedData
+            )
+        }
+    }
+
+    with_at_end!{
+        #[inline]
+        pub fn add_section(
+            &mut self,
+            segment: StandardSegment,
+            name: &[u8],
+            kind: SectionKind,
+        ) -> SectionId {
+            self.obj.add_section(
+                self.segment_name(segment).to_vec(),
+                name.to_vec(),
+                kind,
+            )
+        }
+    }
+
+    // -----
 
     fn into_finish_error(mut self) -> FinishError {
         let renderer = DiagnosticRenderer::new();
@@ -234,8 +303,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn next_pcrel_label(
         &mut self,
         part: PcrelPart
@@ -297,23 +365,6 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    pub fn add_section_at_end(
-        &mut self,
-        segment: StandardSegment,
-        name: &[u8],
-        kind: SectionKind,
-    ) -> SectionId {
-        let section = self.obj.add_section(
-            self.obj.segment_name(segment).to_vec(),
-            name.to_vec(),
-            kind,
-        );
-
-        self.position_at_end(section);
-        section
-    }
-
-    #[inline]
     #[track_caller]
     pub fn add_reloc(
         &mut self,
@@ -343,7 +394,6 @@ impl<'a> Assembler<'a> {
     #[inline]
     pub fn resolve_final_relocs(&mut self) {
         let relocs = mem::take(&mut self.relocs);
-
         for (section_id, reloc) in relocs {
             self.add_reloc(section_id, reloc);
         }
@@ -491,10 +541,10 @@ impl<'a> Assembler<'a> {
         let section_id = self.expect_curr_section();
         let offset = self.emit_bytes(i);
 
-        // determine rtype
         let rtype = match i {
             I::JAL { .. } => RelocKind::Jal,
-            I::BEQ { .. } | I::BNE { .. } | I::BLT { .. } | I::BGE { .. } |
+            I::BEQ { .. }  | I::BNE { .. } |
+            I::BLT { .. }  | I::BGE { .. } |
             I::BLTU { .. } | I::BGEU { .. } => RelocKind::Branch,
             _ => unimplemented!("unsupported branch instruction type"),
         };
@@ -612,31 +662,6 @@ impl<'a> Assembler<'a> {
         })
     }
 
-    #[inline]
-    fn emit_bytes_at_(
-        &mut self,
-        data: impl IntoBytes<'a>,
-        section: SectionId,
-        reloc: Option<(SymbolId, RelocKind)>,
-    ) -> u64 {
-        let offset = self.obj.append_section_data(
-            section,
-            &data.into_bytes(),
-            1 // align
-        );
-
-        if let Some((symbol, rtype)) = reloc {
-            self.add_reloc(section, Reloc {
-                offset,
-                symbol,
-                rtype,
-                addend: 0
-            })
-        }
-
-        offset
-    }
-
     #[inline(always)]
     pub fn emit_bytes_at(
         &mut self,
@@ -656,14 +681,27 @@ impl<'a> Assembler<'a> {
         self.emit_bytes_at(data, section)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn emit_bytes_with_reloc_at(
         &mut self,
         data: impl IntoBytes<'a>,
         section: SectionId,
-        reloc: (SymbolId, RelocKind),
+        (symbol, rtype): (SymbolId, RelocKind),
     ) -> u64 {
-        self.emit_bytes_at_(data, section, Some(reloc))
+        let offset = self.obj.append_section_data(
+            section,
+            &data.into_bytes(),
+            1 // align
+        );
+
+        self.add_reloc(section, Reloc {
+            offset,
+            symbol,
+            rtype,
+            addend: 0
+        });
+
+        offset
     }
 
     #[inline(always)]
@@ -698,6 +736,44 @@ impl<'a> Assembler<'a> {
         let section = self.expect_curr_section();
         self.create_pcrel_hi_label_at(section, offset)
     }
+
+    #[inline]
+    pub fn emit_function_prologue_at(&mut self, section: SectionId) {
+        self.emit_bytes_at(
+            I::ADDI { d: Reg::SP, s: Reg::SP, im: -16 },
+            section,
+        );
+        self.emit_bytes_at(rv64::encode_sd(Reg::RA, Reg::SP, 8), section);
+        self.emit_bytes_at(rv64::encode_sd(Reg::S0, Reg::SP, 0), section);
+        self.emit_bytes_at(
+            I::ADDI { d: Reg::S0, s: Reg::SP, im: 16 },
+            section
+        );
+    }
+
+    #[inline(always)]
+    pub fn emit_function_prologue(&mut self) {
+        let section = self.expect_curr_section();
+        self.emit_function_prologue_at(section);
+    }
+
+    #[inline]
+    pub fn emit_function_epilogue_at(&mut self, section: SectionId) {
+        self.emit_bytes_at(rv64::encode_ld(Reg::RA, Reg::SP, 8), section);
+        self.emit_bytes_at(rv64::encode_ld(Reg::S0, Reg::SP, 0), section);
+        self.emit_bytes_at(
+            I::ADDI { d: Reg::SP, s: Reg::SP, im: 16 },
+            section,
+        );
+    }
+
+    #[inline(always)]
+    pub fn emit_function_epilogue(&mut self) {
+        let section = self.expect_curr_section();
+        self.emit_function_epilogue_at(section);
+    }
+
+    // ----- OPS EMISSION -----
 
     #[inline]
     pub fn emit_pcrel_load_addr_at(
@@ -742,7 +818,7 @@ impl<'a> Assembler<'a> {
         );
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn emit_call_plt(&mut self, target_sym: SymbolId) {
         let section = self.expect_curr_section();
         self.emit_call_plt_at(section, target_sym);
@@ -767,42 +843,6 @@ impl<'a> Assembler<'a> {
         self.emit_call_direct_at(sym, section);
     }
 
-    #[inline]
-    pub fn emit_function_prologue_at(&mut self, section: SectionId) {
-        self.emit_bytes_at(
-            I::ADDI { d: Reg::SP, s: Reg::SP, im: -16 },
-            section,
-        );
-        self.emit_bytes_at(rv64::encode_sd(Reg::RA, Reg::SP, 8), section);
-        self.emit_bytes_at(rv64::encode_sd(Reg::S0, Reg::SP, 0), section);
-        self.emit_bytes_at(
-            I::ADDI { d: Reg::S0, s: Reg::SP, im: 16 },
-            section
-        );
-    }
-
-    #[inline(always)]
-    pub fn emit_function_prologue(&mut self) {
-        let section = self.expect_curr_section();
-        self.emit_function_prologue_at(section);
-    }
-
-    #[inline]
-    pub fn emit_function_epilogue_at(&mut self, section: SectionId) {
-        self.emit_bytes_at(rv64::encode_ld(Reg::RA, Reg::SP, 8), section);
-        self.emit_bytes_at(rv64::encode_ld(Reg::S0, Reg::SP, 0), section);
-        self.emit_bytes_at(
-            I::ADDI { d: Reg::SP, s: Reg::SP, im: 16 },
-            section,
-        );
-    }
-
-    #[inline(always)]
-    pub fn emit_function_epilogue(&mut self) {
-        let section = self.expect_curr_section();
-        self.emit_function_epilogue_at(section);
-    }
-
     #[inline(always)]
     pub fn emit_return_imm_at(&mut self, section: SectionId, imm: i64) {
         let bytes = rv64::encode_li_rv64_little(Reg::A0, imm);
@@ -817,6 +857,220 @@ impl<'a> Assembler<'a> {
     pub fn emit_return_imm(&mut self, imm: i64) {
         let section = self.expect_curr_section();
         self.emit_return_imm_at(section, imm);
+    }
+
+    // ----- LOAD/STORE OPERATIONS -----
+
+    /// Emit load byte (LB)
+    #[inline(always)]
+    pub fn emit_lb(&mut self, rd: Reg, rs1: Reg, offset: i16) {
+        self.emit_bytes(I::LB { d: rd, s: rs1, im: offset });
+    }
+
+    /// Emit load halfword (LH)
+    #[inline(always)]
+    pub fn emit_lh(&mut self, rd: Reg, rs1: Reg, offset: i16) {
+        self.emit_bytes(I::LH { d: rd, s: rs1, im: offset });
+    }
+
+    /// Emit load word (LW)
+    #[inline(always)]
+    pub fn emit_lw(&mut self, rd: Reg, rs1: Reg, offset: i16) {
+        self.emit_bytes(I::LW { d: rd, s: rs1, im: offset });
+    }
+
+    /// Emit load doubleword (LD) - RV64 only
+    #[inline(always)]
+    pub fn emit_ld(&mut self, rd: Reg, rs1: Reg, offset: i16) {
+        self.emit_bytes(rv64::encode_ld(rd, rs1, offset));
+    }
+
+    /// Emit store byte (SB)
+    #[inline(always)]
+    pub fn emit_sb(&mut self, rs1: Reg, rs2: Reg, offset: i16) {
+        self.emit_bytes(I::SB { s1: rs1, s2: rs2, im: offset });
+    }
+
+    /// Emit store halfword (SH)
+    #[inline(always)]
+    pub fn emit_sh(&mut self, rs1: Reg, rs2: Reg, offset: i16) {
+        self.emit_bytes(I::SH { s1: rs1, s2: rs2, im: offset });
+    }
+
+    /// Emit store word (SW)
+    #[inline(always)]
+    pub fn emit_sw(&mut self, rs1: Reg, rs2: Reg, offset: i16) {
+        self.emit_bytes(I::SW { s1: rs1, s2: rs2, im: offset });
+    }
+
+    /// Emit store doubleword (SD) - RV64 only
+    #[inline(always)]
+    pub fn emit_sd(&mut self, rs1: Reg, rs2: Reg, offset: i16) {
+        self.emit_bytes(rv64::encode_sd(rs1, rs2, offset));
+    }
+
+    // ----- ARITHMETIC OPERATIONS -----
+
+    /// Emit ADD instruction
+    #[inline(always)]
+    pub fn emit_add(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::ADD { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    /// Emit SUB instruction
+    #[inline(always)]
+    pub fn emit_sub(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::SUB { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    /// Emit ADDI instruction
+    #[inline(always)]
+    pub fn emit_addi(&mut self, rd: Reg, rs1: Reg, im: i16) {
+        self.emit_bytes(I::ADDI { d: rd, s: rs1, im });
+    }
+
+    /// Load immediate value into register (pseudo-instruction)
+    #[inline(always)]
+    pub fn emit_li(&mut self, rd: Reg, imm: i64) {
+        let bytes = rv64::encode_li_rv64_little(rd, imm);
+        self.emit_bytes(bytes);
+    }
+
+    /// Move register to register (pseudo-instruction: ADDI rd, rs, 0)
+    #[inline(always)]
+    pub fn emit_mv(&mut self, rd: Reg, rs: Reg) {
+        self.emit_addi(rd, rs, 0);
+    }
+
+    // ----- LOGICAL OPERATIONS -----
+
+    #[inline(always)]
+    pub fn emit_and(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::AND { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_or(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::OR { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_xor(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::XOR { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_andi(&mut self, rd: Reg, rs1: Reg, im: i16) {
+        self.emit_bytes(I::ANDI { d: rd, s: rs1, im });
+    }
+
+    #[inline(always)]
+    pub fn emit_ori(&mut self, rd: Reg, rs1: Reg, im: i16) {
+        self.emit_bytes(I::ORI { d: rd, s: rs1, im });
+    }
+
+    #[inline(always)]
+    pub fn emit_xori(&mut self, rd: Reg, rs1: Reg, im: i16) {
+        self.emit_bytes(I::XORI { d: rd, s: rs1, im });
+    }
+
+    // === SHIFT OPERATIONS ===
+
+    #[inline(always)]
+    pub fn emit_sll(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::SLL { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_srl(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::SRL { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_sra(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::SRA { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_slli(&mut self, rd: Reg, rs1: Reg, shamt: i8) {
+        self.emit_bytes(I::SLLI { d: rd, s: rs1, im: shamt });
+    }
+
+    #[inline(always)]
+    pub fn emit_srli(&mut self, rd: Reg, rs1: Reg, shamt: i8) {
+        self.emit_bytes(I::SRLI { d: rd, s: rs1, im: shamt });
+    }
+
+    #[inline(always)]
+    pub fn emit_srai(&mut self, rd: Reg, rs1: Reg, shamt: i8) {
+        self.emit_bytes(I::SRAI { d: rd, s: rs1, im: shamt });
+    }
+
+    // === COMPARISON OPERATIONS ===
+
+    #[inline(always)]
+    pub fn emit_slt(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::SLT { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_sltu(&mut self, rd: Reg, rs1: Reg, rs2: Reg) {
+        self.emit_bytes(I::SLTU { d: rd, s1: rs1, s2: rs2 });
+    }
+
+    #[inline(always)]
+    pub fn emit_slti(&mut self, rd: Reg, rs1: Reg, im: i16) {
+        self.emit_bytes(I::SLTI { d: rd, s: rs1, im });
+    }
+
+    // === JUMP OPERATIONS ===
+
+    /// Jump and link to label
+    #[inline(always)]
+    pub fn emit_jal(&mut self, rd: Reg, label: LabelId) {
+        self.emit_branch_to(label, I::JAL { d: rd, im: 0 });
+    }
+
+    /// Jump and link register
+    #[inline(always)]
+    pub fn emit_jalr(&mut self, rd: Reg, rs1: Reg, offset: i16) {
+        self.emit_bytes(I::JALR { d: rd, s: rs1, im: offset });
+    }
+
+    // ----- PSEUDO OPS EMISSION -----
+
+    // --- JUMP OPERATIONS ---
+
+    /// Jump to label (pseudo-instruction: JAL x0, label)
+    #[inline(always)]
+    pub fn emit_j(&mut self, lbl_id: LabelId) {
+        self.emit_jal(Reg::ZERO, lbl_id);
+    }
+
+    /// Return from function (pseudo-instruction: JALR x0, ra, 0)
+    #[inline(always)]
+    pub fn emit_ret(&mut self) {
+        self.emit_jalr(Reg::ZERO, Reg::RA, 0);
+    }
+
+    /// No operation (ADDI x0, x0, 0)
+    #[inline(always)]
+    pub fn emit_nop(&mut self) {
+        self.emit_addi(Reg::ZERO, Reg::ZERO, 0);
+    }
+
+    /// Push register onto stack
+    #[inline(always)]
+    pub fn emit_push(&mut self, reg: Reg) {
+        self.emit_addi(Reg::SP, Reg::SP, -8);
+        self.emit_sd(Reg::SP, reg, 0);
+    }
+
+    /// Pop register from stack
+    #[inline(always)]
+    pub fn emit_pop(&mut self, reg: Reg) {
+        self.emit_ld(reg, Reg::SP, 0);
+        self.emit_addi(Reg::SP, Reg::SP, 8);
     }
 }
 

@@ -51,3 +51,24 @@ macro_rules! debug_from_display {
         }
     };
 }
+
+macro_rules! with_at_end {
+    (
+        $(#[$meta:meta])*
+        $vis:vis fn $name:ident(
+            &mut $self:ident $(, $param_name:ident: $param_type:ty $(,)?)*
+        ) $(-> $ret:ty)? $body:block
+    ) => {
+        $(#[$meta])*
+        $vis fn $name(&mut $self $(, $param_name: $param_type)*) $(-> $ret)? $body
+
+        paste::paste! {
+            #[inline(always)]
+            $vis fn [<$name _at_end>](&mut $self $(, $param_name: $param_type)*) $(-> $ret)? {
+                let sid = $self.$name($($param_name),*);
+                $self.position_at_end(sid);
+                sid
+            }
+        }
+    };
+}
