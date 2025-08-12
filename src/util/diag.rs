@@ -31,13 +31,15 @@ pub struct DiagnosticRenderer {
     handler: GraphicalReportHandler,
 }
 
-impl DiagnosticRenderer {
-    const RENDERED_PREALLOCATION_SIZE: usize = 512;
-
+impl Default for DiagnosticRenderer {
     #[inline(always)]
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self { handler: GraphicalReportHandler::new() }
     }
+}
+
+impl DiagnosticRenderer {
+    const RENDERED_PREALLOCATION_SIZE: usize = 512;
 
     #[inline]
     pub fn render_to_string(&self, diag: &impl Diagnostic) -> String {
@@ -178,8 +180,7 @@ pub fn calculate_byte_offset_large(text: &str, target_line: usize, target_col: u
 
             if lines_seen + newlines_in_chunk >= target_line {
                 let mut local_search = 0;
-                let mut newline_iter = Memchr::new(b'\n', &chunk[local_search..]);
-                while let Some(pos) = newline_iter.next() {
+                for pos in Memchr::new(b'\n', &chunk[local_search..]) {
                     lines_seen += 1;
 
                     if lines_seen == target_line {

@@ -1,7 +1,9 @@
 //! RV64 extension for asm_riscv (RV32)
 
 use crate::util::misc;
+use crate::util::opcode::AqRl;
 use crate::asm_riscv::{I, Reg};
+use crate::util::opcode::RV64Opcode::*;
 use crate::util::into_bytes::IntoBytes;
 
 use std::mem;
@@ -9,42 +11,6 @@ use std::mem;
 use smallvec::SmallVec;
 
 pub type RV64Inst = SmallVec<[u8; mem::size_of::<u32>() * 6]>;
-
-/// RISC-V RV64I and M-extension opcodes for instruction encoding.
-#[repr(u32)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum RV64Opcode {
-    /// LOAD        opcode (`0x03`, binary `0000011`) for load instructions (e.g., LD, LWU).
-    Load    = 0x03,
-
-    /// STORE       opcode (`0x23`, binary `1000011`) for store instructions (e.g., SD).
-    Store   = 0x23,
-
-    /// OP          opcode (`0x33`, binary `0110011`) for register-register operations (e.g., MUL, ADD).
-    Op      = 0x33,
-
-    /// OP-32       opcode (`0x3B`, binary `0111011`) for 32-bit register-register operations (e.g., ADDW, SUBW, SLLW, SRLW, SRAW).
-    Op32    = 0x3B,
-
-    /// OP-IMM-32   opcode (`0x1B`, binary `0011011`) for 32-bit immediate operations (e.g., ADDIW, SLLIW, SRLIW, SRAIW).
-    OpImm32 = 0x1B,
-
-    /// OP-IMM      opcode (`0x13`, binary `0010011`) for immediate operations (e.g., ADDI).
-    OpImm   = 0x13,
-
-    /// LUI         opcode (`0x37`, binary `0110111`) for Load Upper Immediate.
-    Lui     = 0x37,
-}
-
-use RV64Opcode::*;
-
-impl RV64Opcode {
-    /// Returns the 7-bit opcode value as a `u32` for instruction encoding.
-    #[inline(always)]
-    pub const fn as_u32(self) -> u32 {
-        self as _
-    }
-}
 
 /// Encode RISC-V LD (Load Doubleword) instruction.
 /// imm is a signed 12-bit offset.
@@ -672,6 +638,519 @@ pub const fn encode_lwu(rd: Reg, rs1: Reg, imm: i16) -> u32 {
         | (6 << 12)            // funct3 = 6 for LWU
         | ((rd as u32) << 7)   // dest
         | 0x03                 // opcode = LOAD
+}
+
+// === A-extension Load-Reserved/Store-Conditional Instructions ===
+
+/// Encode RISC-V LR.W (A-extension) instruction.
+/// Loads a 32-bit word from address in rs1, places it in rd (sign-extended).
+/// rs2 must be 0. Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_lr_w;
+/// let inst = encode_lr_w(Reg::A0, Reg::A1, AqRl::None);
+/// assert_eq!(inst, 0x1005A52F); // lr.w a0, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_lr_w(rd: Reg, rs1: Reg, aqrl: AqRl) -> u32 {
+    (0x02 << 27)               // funct5 = 00010 for LR
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | (0 << 20)            // rs2 = 0 for LR
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V SC.W (A-extension) instruction.
+/// Conditionally stores a 32-bit word from rs2 to address in rs1, sets rd to 0 on success, 1 on failure.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_sc_w;
+/// let inst = encode_sc_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x18C5A52F); // sc.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_sc_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x03 << 27)               // funct5 = 00011 for SC
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to store)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, status)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V LR.D (A-extension) instruction.
+/// Loads a 64-bit doubleword from address in rs1, places it in rd.
+/// rs2 must be 0. Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_lr_d;
+/// let inst = encode_lr_d(Reg::A0, Reg::A1, AqRl::None);
+/// assert_eq!(inst, 0x1005B52F); // lr.d a0, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_lr_d(rd: Reg, rs1: Reg, aqrl: AqRl) -> u32 {
+    (0x02 << 27)               // funct5 = 00010 for LR
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | (0 << 20)            // rs2 = 0 for LR
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V SC.D (A-extension) instruction.
+/// Conditionally stores a 64-bit doubleword from rs2 to address in rs1, sets rd to 0 on success, 1 on failure.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_sc_d;
+/// let inst = encode_sc_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x18C5B52F); // sc.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_sc_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x03 << 27)               // funct5 = 00011 for SC
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to store)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, status)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+// === A-extension Atomic Memory Operations (32-bit) ===
+
+/// Encode RISC-V AMOADD.W (A-extension) instruction.
+/// Atomically adds rs2 to 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoadd_w;
+/// let inst = encode_amoadd_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x00C5A52F); // amoadd.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoadd_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x00 << 27)               // funct5 = 00000 for AMOADD
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to add)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOSWAP.W (A-extension) instruction.
+/// Atomically swaps 32-bit word in rs2 with word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoswap_w;
+/// let inst = encode_amoswap_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x08C5A52F); // amoswap.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoswap_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x01 << 27)               // funct5 = 00001 for AMOSWAP
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to swap)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOAND.W (A-extension) instruction.
+/// Atomically ANDs rs2 with 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoand_w;
+/// let inst = encode_amoand_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x60C5A52F); // amoand.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoand_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x0C << 27)               // funct5 = 01100 for AMOAND
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to AND)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOOR.W (A-extension) instruction.
+/// Atomically ORs rs2 with 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoor_w;
+/// let inst = encode_amoor_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x40C5A52F); // amoor.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoor_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x08 << 27)               // funct5 = 01000 for AMOOR
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to OR)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOXOR.W (A-extension) instruction.
+/// Atomically XORs rs2 with 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoxor_w;
+/// let inst = encode_amoxor_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x20C5A52F); // amoxor.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoxor_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x04 << 27)               // funct5 = 00100 for AMOXOR
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to XOR)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMAX.W (A-extension) instruction.
+/// Atomically stores max of rs2 and signed 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amomax_w;
+/// let inst = encode_amomax_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0xA0C5A52F); // amomax.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amomax_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x14 << 27)               // funct5 = 10100 for AMOMAX
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMIN.W (A-extension) instruction.
+/// Atomically stores min of rs2 and signed 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amomin_w;
+/// let inst = encode_amomin_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x80C5A52F); // amomin.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amomin_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x10 << 27)               // funct5 = 10000 for AMOMIN
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMAXU.W (A-extension) instruction.
+/// Atomically stores max of rs2 and unsigned 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amomaxu_w;
+/// let inst = encode_amomaxu_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0xE0C5A52F); // amomaxu.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amomaxu_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x1C << 27)               // funct5 = 11100 for AMOMAXU
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMINU.W (A-extension) instruction.
+/// Atomically stores min of rs2 and unsigned 32-bit word at address in rs1, stores original value in rd (sign-extended).
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amominu_w;
+/// let inst = encode_amominu_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0xC0C5A52F); // amominu.w a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amominu_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x18 << 27)               // funct5 = 11000 for AMOMINU
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x2 << 12)          // funct3 = 010 for .W
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+// === A-extension Atomic Memory Operations (64-bit) ===
+
+/// Encode RISC-V AMOADD.D (A-extension) instruction.
+/// Atomically adds rs2 to 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+///
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoadd_d;
+/// let inst = encode_amoadd_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x00C5B52F); // amoadd.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoadd_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x00 << 27)                // funct5 = 00000 for AMOADD
+        | (aqrl.as_u32() << 25) // aq/rl bits
+        | ((rs2 as u32) << 20)  // rs2 (value to add)
+        | ((rs1 as u32) << 15)  // rs1 (address)
+        | (0x3 << 12)           // funct3 = 011 for .D
+        | ((rd as u32) << 7)    // rd (destination, original value)
+        | Amo.as_u32()          // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOSWAP.D (A-extension) instruction.
+/// Atomically swaps 64-bit doubleword in rs2 with doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoswap_d;
+/// let inst = encode_amoswap_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x08C5B52F); // amoswap.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoswap_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x01 << 27)               // funct5 = 00001 for AMOSWAP
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to swap)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOAND.D (A-extension) instruction.
+/// Atomically ANDs rs2 with 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoand_d;
+/// let inst = encode_amoand_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x60C5B52F); // amoand.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoand_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x0C << 27)               // funct5 = 01100 for AMOAND
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to AND)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOOR.D (A-extension) instruction.
+/// Atomically ORs rs2 with 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoor_d;
+/// let inst = encode_amoor_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x40C5B52F); // amoor.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoor_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x08 << 27)               // funct5 = 01000 for AMOOR
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to OR)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOXOR.D (A-extension) instruction.
+/// Atomically XORs rs2 with 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amoxor_d;
+/// let inst = encode_amoxor_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x20C5B52F); // amoxor.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amoxor_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x04 << 27)               // funct5 = 00100 for AMOXOR
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to XOR)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMAX.D (A-extension) instruction.
+/// Atomically stores max of rs2 and signed 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amomax_d;
+/// let inst = encode_amomax_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0xA0C5B52F); // amomax.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amomax_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x14 << 27)               // funct5 = 10100 for AMOMAX
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMIN.D (A-extension) instruction.
+/// Atomically stores min of rs2 and signed 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amomin_d;
+/// let inst = encode_amomin_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0x80C5B52F); // amomin.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amomin_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x10 << 27)               // funct5 = 10000 for AMOMIN
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMAXU.D (A-extension) instruction.
+/// Atomically stores max of rs2 and unsigned 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amomaxu_d;
+/// let inst = encode_amomaxu_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0xE0C5B52F); // amomaxu.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amomaxu_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x1C << 27)               // funct5 = 11100 for AMOMAXU
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
+}
+
+/// Encode RISC-V AMOMINU.D (A-extension) instruction.
+/// Atomically stores min of rs2 and unsigned 64-bit doubleword at address in rs1, stores original value in rd.
+/// Supports acquire/release ordering.
+///
+/// # Example
+/// ```
+/// use brik::asm_riscv::Reg;
+/// use brik::util::opcode::AqRl;
+/// use brik::util::rv64::encode_amominu_d;
+/// let inst = encode_amominu_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
+/// assert_eq!(inst, 0xC0C5B52F); // amominu.d a0, a2, (a1)
+/// ```
+#[inline(always)]
+pub const fn encode_amominu_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
+    (0x18 << 27)               // funct5 = 11000 for AMOMINU
+        | (aqrl.as_u32() << 25)// aq/rl bits
+        | ((rs2 as u32) << 20) // rs2 (value to compare)
+        | ((rs1 as u32) << 15) // rs1 (address)
+        | (0x3 << 12)          // funct3 = 011 for .D
+        | ((rd as u32) << 7)   // rd (destination, original value)
+        | Amo.as_u32()         // opcode = 0x2F for AMO
 }
 
 #[cfg(test)]

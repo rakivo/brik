@@ -261,7 +261,7 @@ impl<'a> Assembler<'a> {
     // -----
 
     fn into_finish_error(mut self) -> FinishError {
-        let renderer = DiagnosticRenderer::new();
+        let renderer = DiagnosticRenderer::default();
 
         let mut file_cache = FxHashMap::<_, Arc<str>>::default();
 
@@ -277,7 +277,7 @@ impl<'a> Assembler<'a> {
             let file_path = info.caller_loc.file();
 
             let content = file_cache.entry(file_path).or_insert_with(|| {
-                fs::read_to_string(&file_path).unwrap_or_default().into()
+                fs::read_to_string(file_path).unwrap_or_default().into()
             });
 
             let (named_src, span) = diag::text_into_named_source_and_source_span(
@@ -594,7 +594,7 @@ impl<'a> Assembler<'a> {
     #[inline]
     pub fn place_label_here(&mut self, lbl_id: LabelId) {
         let section_id = self.expect_curr_section();
-        let offset = self.section_size(section_id) as u64;
+        let offset = self.section_size(section_id);
         self.place_label_at(lbl_id, offset);
     }
 
