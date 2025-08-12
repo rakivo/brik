@@ -283,6 +283,7 @@ pub const fn encode_remuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// assert_eq!(inst, 0x02c58533); // mul a0, a1, a2
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     (0x01 << 25)               // funct7 = 0x01
         | ((rs2 as u32) << 20) // multiplier
@@ -303,6 +304,7 @@ pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// assert_eq!(inst, 0x02C5853B); // mulw a0, a1, a2
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_mulw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     (0x01 << 25)               // funct7 = 0000001 for M-extension
         | ((rs2 as u32) << 20) // rs2 (multiplier)
@@ -448,6 +450,7 @@ pub const fn encode_mulhu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// // addw a0, a1, a2
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_addw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     // opcode 0x3B, funct3 = 0, funct7 = 0
     ((rs2 as u32) << 20)
@@ -469,6 +472,7 @@ pub const fn encode_addw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// assert_eq!(encode_subw(Reg::A0, Reg::A1, Reg::A2), 0x40c5853b);
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_subw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     // opcode 0x3B, funct3 = 0, funct7 = 0x20
     ((rs2 as u32) << 20)       // src2
@@ -491,6 +495,7 @@ pub const fn encode_subw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// // addiw a0, a1, 42
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_addiw(rd: Reg, rs1: Reg, imm: i16) -> u32 {
     let imm12 = (imm as u32) & 0xfff;
     (imm12 << 20)              // [11:0] I-imm
@@ -511,6 +516,7 @@ pub const fn encode_addiw(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 /// assert_eq!(encode_sllw(Reg::A0, Reg::A1, Reg::A2), 0xc5953b);
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_sllw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     ((rs2 as u32) << 20)       // rs2 (shift amount in lower 5 bits) (src2)
         | ((rs1 as u32) << 15) // rs1 (src1)
@@ -531,6 +537,7 @@ pub const fn encode_sllw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// assert_eq!(encode_srlw(Reg::A0, Reg::A1, Reg::A2), 0xc5d53b);
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_srlw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
     ((rs2 as u32) << 20)       // rs2 (shift amount in lower 5 bits)
         | ((rs1 as u32) << 15) // rs1
@@ -655,6 +662,7 @@ pub const fn encode_lwu(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 /// assert_eq!(inst, 0x1005A52F); // lr.w a0, (a1)
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_lr_w(rd: Reg, rs1: Reg, aqrl: AqRl) -> u32 {
     (0x02 << 27)               // funct5 = 00010 for LR
         | (aqrl.as_u32() << 25)// aq/rl bits
@@ -701,6 +709,7 @@ pub const fn encode_sc_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 /// assert_eq!(inst, 0x1005B52F); // lr.d a0, (a1)
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_lr_d(rd: Reg, rs1: Reg, aqrl: AqRl) -> u32 {
     (0x02 << 27)               // funct5 = 00010 for LR
         | (aqrl.as_u32() << 25)// aq/rl bits
@@ -749,6 +758,7 @@ pub const fn encode_sc_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 /// assert_eq!(inst, 0x00C5A52F); // amoadd.w a0, a2, (a1)
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_amoadd_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
     (0x00 << 27)               // funct5 = 00000 for AMOADD
         | (aqrl.as_u32() << 25)// aq/rl bits
@@ -959,6 +969,7 @@ pub const fn encode_amominu_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 /// assert_eq!(inst, 0x00C5B52F); // amoadd.d a0, a2, (a1)
 /// ```
 #[inline(always)]
+#[allow(clippy::identity_op)]
 pub const fn encode_amoadd_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
     (0x00 << 27)                // funct5 = 00000 for AMOADD
         | (aqrl.as_u32() << 25) // aq/rl bits
