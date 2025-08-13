@@ -85,8 +85,8 @@ impl SourceCode for BrikNamedSource {
 
 /// Diagnostic struct for rendering errors of unplaced labels.
 #[derive(Debug, Error)]
-#[cfg_attr(feature = "fancy-diagnostics", derive(Diagnostic))]
 #[error("unplaced label '{name}'")]
+#[cfg_attr(feature = "fancy-diagnostics", derive(Diagnostic))]
 pub struct UnplacedLabelDiagnostic {
     /// The name of the unplaced label.
     pub name: String,
@@ -100,6 +100,10 @@ pub struct UnplacedLabelDiagnostic {
     pub src: BrikNamedSource,
 }
 
+#[derive(Default)]
+#[cfg(not(feature = "fancy-diagnostics"))]
+pub struct DiagnosticRenderer;
+
 #[cfg(feature = "fancy-diagnostics")]
 pub struct DiagnosticRenderer {
     handler: GraphicalReportHandler,
@@ -109,47 +113,42 @@ pub struct DiagnosticRenderer {
 impl Default for DiagnosticRenderer {
     #[inline(always)]
     fn default() -> Self {
-        Self {
-            handler: GraphicalReportHandler::new(),
-        }
+        Self { handler: GraphicalReportHandler::new() }
     }
 }
 
-#[cfg(feature = "fancy-diagnostics")]
 impl DiagnosticRenderer {
-    const RENDERED_PREALLOCATION_SIZE: usize = 512;
-
     #[inline]
+    #[cfg(feature = "fancy-diagnostics")]
     pub fn render_to_string(&self, diag: &impl Diagnostic) -> String {
-        let mut rendered = String::with_capacity(Self::RENDERED_PREALLOCATION_SIZE);
+        const RENDERED_PREALLOCATION_SIZE: usize = 512;
+
+        let mut rendered = String::with_capacity(RENDERED_PREALLOCATION_SIZE);
         self.handler
             .render_report(&mut rendered, diag)
             .expect("render_report should not fail");
 
         rendered
     }
-}
 
-#[derive(Default)]
-#[cfg(not(feature = "fancy-diagnostics"))]
-pub struct DiagnosticRenderer;
-
-#[cfg(not(feature = "fancy-diagnostics"))]
-impl DiagnosticRenderer {
+    // TODO: Generalize `diag` param type in not(fancy-diagnostics)
+    // in DiagnosticRenderer::render_to_string
     #[inline]
+    #[cfg(not(feature = "fancy-diagnostics"))]
     pub fn render_to_string(&self, diag: &UnplacedLabelDiagnostic) -> String {
         use std::string::ToString;
 
         let src_name = diag.src.file_name();
         let src_content = diag.src.inner();
+        let src_content_bytes = src_content.as_bytes();
         let span_start = diag.span.offset;
         let span_len = diag.span.length;
 
-        let line_start = memchr::memrchr(b'\n', &src_content.as_bytes()[..span_start])
+        let line_start = memchr::memrchr(b'\n', &src_content_bytes[..span_start])
             .map(|i| i + 1)
             .unwrap_or(0);
 
-        let line_end = memchr::memchr(b'\n', &src_content.as_bytes()[span_start..])
+        let line_end = memchr::memchr(b'\n', &src_content_bytes[span_start..])
             .map(|i| span_start + i)
             .unwrap_or(src_content.len());
 
