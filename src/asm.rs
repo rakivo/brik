@@ -137,17 +137,19 @@ impl<'a> Assembler<'a> {
             ),
         };
 
-        let _attr_section = asm.add_section_at_end(
-            StandardSegment::Data,
-            b".riscv.attributes",
-            SectionKind::Other,
-        );
+        if format == BinaryFormat::Elf {
+            let riscv_attrs = asm.add_section(
+                StandardSegment::Data,
+                b".riscv.attributes",
+                SectionKind::Other,
+            );
 
-        let attrs = RiscvAttrsBuilder::new("riscv")
-            .arch(isa)
-            .build();
+            let attrs = RiscvAttrsBuilder::new("riscv")
+                .arch(isa)
+                .build();
 
-        asm.emit_bytes(attrs);
+            asm.emit_bytes_at(attrs, riscv_attrs);
+        }
 
         asm
     }
