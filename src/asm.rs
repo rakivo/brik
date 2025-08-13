@@ -83,6 +83,8 @@ pub struct Assembler<'a> {
     pcrel_counter: u32,
     lbl_id_counter: LabelId,
 
+    format: BinaryFormat,
+
     labels          : FxHashMap<LabelId, Label>,
     unplaced_labels : FxHashMap<LabelId, UnplacedLabelInfo>,
 }
@@ -126,6 +128,7 @@ impl<'a> Assembler<'a> {
         isa: &str
     ) -> Self {
         let mut asm = Self {
+            format,
             pcrel_counter: 0,
             lbl_id_counter: LabelId(0),
             curr_section: None,
@@ -137,7 +140,7 @@ impl<'a> Assembler<'a> {
             ),
         };
 
-        if format == BinaryFormat::Elf {
+        if asm.format == BinaryFormat::Elf {
             let riscv_attrs = asm.add_section(
                 StandardSegment::Data,
                 b".riscv.attributes",
@@ -266,10 +269,10 @@ impl<'a> Assembler<'a> {
     with_at_end!{
         /// Add a text section
         #[inline(always)]
-        pub fn add_text_section(&mut self, name: &[u8]) -> SectionId {
+        pub fn add_text_section(&mut self) -> SectionId {
             self.add_section(
                 StandardSegment::Text,
-                name,
+                b".text",
                 SectionKind::Text,
             )
         }
@@ -278,10 +281,10 @@ impl<'a> Assembler<'a> {
     with_at_end!{
         /// Add a data section
         #[inline]
-        pub fn add_data_section(&mut self, name: &[u8]) -> SectionId {
+        pub fn add_data_section(&mut self) -> SectionId {
             self.add_section(
                 StandardSegment::Data,
-                name,
+                b".data",
                 SectionKind::Data
             )
         }
@@ -290,10 +293,14 @@ impl<'a> Assembler<'a> {
     with_at_end!{
         /// Add a read-only data section
         #[inline]
-        pub fn add_rodata_section(&mut self, name: &[u8]) -> SectionId {
+        pub fn add_rodata_section(&mut self) -> SectionId {
             self.add_section(
                 StandardSegment::Data,
-                name,
+                if self.format == BinaryFormat::Coff {
+                    b".rdata"
+                } else {
+                    b".rodata"
+                },
                 SectionKind::ReadOnlyData
             )
         }
@@ -302,10 +309,10 @@ impl<'a> Assembler<'a> {
     with_at_end!{
         /// Add a BSS section
         #[inline]
-        pub fn add_bss_section(&mut self, name: &[u8]) -> SectionId {
+        pub fn add_bss_section(&mut self) -> SectionId {
             self.add_section(
                 StandardSegment::Data,
-                name,
+                b".bss",
                 SectionKind::UninitializedData
             )
         }
@@ -701,6 +708,7 @@ impl<'a> Assembler<'a> {
         )
     }
 
+    #[track_caller]
     #[inline(always)]
     pub fn emit_bytes(&mut self, data: impl IntoBytes<'a>) -> u64 {
         let section = self.expect_curr_section();
