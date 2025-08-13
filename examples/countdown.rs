@@ -1,18 +1,15 @@
-use brik::rv64;
 use brik::asm::Assembler;
 use brik::rv32::{I, Reg};
 use brik::object::{
     Endianness,
     SymbolKind,
     SymbolScope,
-    SectionKind,
     Architecture,
     BinaryFormat,
 };
 use brik::object::write::{
     Object,
-    FileFlags,
-    StandardSegment,
+    FileFlags
 };
 
 use std::{fs, env, mem, error};
@@ -31,11 +28,8 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
         e_flags: 0x4,
     });
 
-    let _rodata = asm.add_section_at_end(
-        StandardSegment::Data,
-        b".rodata",
-        SectionKind::ReadOnlyData,
-    );
+    // .rodata section strings
+    let _rodata = asm.add_rodata_section_at_end();
 
     let msg_bytes = b"Hello from RISC-V\n\0";
     let msg_offset = asm.emit_bytes(msg_bytes);
@@ -63,17 +57,13 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
         SymbolScope::Dynamic
     );
 
-    let text_section = asm.add_section_at_end(
-        StandardSegment::Text,
-        b".text",
-        SectionKind::Text,
-    );
+    let text_section = asm.add_text_section_at_end();
 
     asm.emit_function_prologue();
 
     // s1 = count
     asm.emit_pcrel_load_addr(Reg::S1, countdown_sym);
-    asm.emit_bytes(rv64::encode_ld(Reg::S1, Reg::S1, 0));
+    asm.emit_ld(Reg::S1, Reg::S1, 0);
 
     let loop_lbl = asm.add_label_here(b".loop");
 
@@ -83,13 +73,7 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.emit_call_plt(printf_sym);
 
     // s1 -= 1
-    asm.emit_bytes(
-        I::ADDI {
-            d: Reg::S1,
-            s: Reg::S1,
-            im: -1
-        }
-    );
+    asm.emit_addi(Reg::S1, Reg::S1, -1);
 
     // blt 0, s1
     asm.emit_branch_to(
@@ -107,7 +91,7 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.add_symbol(
         b"main",
         0,
-        asm.section_size(text_section) as _,
+        asm.section_size(text_section),
         SymbolKind::Text,
         SymbolScope::Dynamic,
     );

@@ -5,14 +5,12 @@ use brik::object::{
     Endianness,
     SymbolKind,
     SymbolScope,
-    SectionKind,
     Architecture,
     BinaryFormat,
 };
 use brik::object::write::{
     Object,
-    FileFlags,
-    StandardSegment,
+    FileFlags
 };
 
 use std::{fs, env, error};
@@ -32,11 +30,7 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     });
 
     // .rodata section for format strings
-    let _rodata = asm.add_section_at_end(
-        StandardSegment::Data,
-        b".rodata",
-        SectionKind::ReadOnlyData,
-    );
+    let _rodata = asm.add_rodata_section_at_end();
 
     let input_fmt_bytes = b"enter a number: \0";
     let input_fmt_offset = asm.emit_bytes(input_fmt_bytes);
@@ -81,17 +75,12 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
         SymbolScope::Dynamic
     );
 
-    // .text section
-    let text_section = asm.add_section_at_end(
-        StandardSegment::Text,
-        b".text",
-        SectionKind::Text,
-    );
+    let text_section = asm.add_text_section_at_end();
 
     asm.emit_function_prologue();
 
     // allocate space on stack for input number (8 bytes)
-    asm.emit_bytes(I::ADDI { d: Reg::SP, s: Reg::SP, im: -8 });
+    asm.emit_addi(Reg::SP, Reg::SP, -8);
 
     // print input prompt
     asm.emit_pcrel_load_addr(Reg::A0, input_fmt_sym);
@@ -99,17 +88,17 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
 
     // read input number
     asm.emit_pcrel_load_addr(Reg::A0, scanf_fmt_sym);
-    asm.emit_bytes(I::ADDI { d: Reg::A1, s: Reg::SP, im: 0 });
+    asm.emit_addi(Reg::A1, Reg::SP, 0);
     asm.emit_call_plt(scanf_sym);
 
     // load input number into s1
-    asm.emit_bytes(rv64::encode_ld(Reg::S1, Reg::SP, 0));
+    asm.emit_ld(Reg::S1, Reg::SP, 0);
 
     // init factorial result in s2 (result = 1)
-    asm.emit_bytes(I::ADDI { d: Reg::S2, s: Reg::ZERO, im: 1 });
+    asm.emit_addi(Reg::S2, Reg::ZERO, 1);
 
     // init counter in s3 (i = 1)
-    asm.emit_bytes(I::ADDI { d: Reg::S3, s: Reg::ZERO, im: 1 });
+    asm.emit_addi(Reg::S3, Reg::ZERO, 1);
 
     let loop_lbl = asm.add_label_here(b".fact_loop");
     let done_lbl = asm.declare_label(b".fact_done");
@@ -125,7 +114,7 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.emit_bytes(rv64::encode_mul(Reg::S2, Reg::S2, Reg::S3));
 
     // i++
-    asm.emit_bytes(I::ADDI { d: Reg::S3, s: Reg::S3, im: 1 });
+    asm.emit_addi(Reg::S3, Reg::S3, 1);
 
     // jump back to loop
     asm.emit_branch_to(
@@ -133,22 +122,23 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
         I::JAL { d: Reg::ZERO, im: 0 },
     );
 
-    // asm.place_label_here(done_lbl);
+    asm.place_label_here(done_lbl);
 
     // print result
     asm.emit_pcrel_load_addr(Reg::A0, result_fmt_sym);
-    asm.emit_bytes(I::ADDI { d: Reg::A1, s: Reg::S2, im: 0 }); // move result to a1
+    asm.emit_mv(Reg::A1, Reg::S2); // move result to a1
+    asm.emit_addi(Reg::A1, Reg::S2, 0);
     asm.emit_call_plt(printf_sym);
 
     // restore stack and return
-    asm.emit_bytes(I::ADDI { d: Reg::SP, s: Reg::SP, im: 8 });
+    asm.emit_addi(Reg::SP, Reg::SP, 8);
     asm.emit_function_epilogue();
     asm.emit_return_imm(0);
 
     asm.add_symbol(
         b"main",
         0,
-        asm.section_size(text_section) as _,
+        asm.section_size(text_section),
         SymbolKind::Text,
         SymbolScope::Dynamic,
     );
