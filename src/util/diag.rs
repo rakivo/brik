@@ -131,8 +131,9 @@ impl DiagnosticRenderer {
         rendered
     }
 
-    // TODO: Generalize `diag` param type in not(fancy-diagnostics)
+    // TODO(#8): Generalize `diag` param type in not(fancy-diagnostics)
     // in DiagnosticRenderer::render_to_string
+
     #[inline]
     #[cfg(not(feature = "fancy-diagnostics"))]
     pub fn render_to_string(&self, diag: &UnplacedLabelDiagnostic) -> String {
