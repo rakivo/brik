@@ -1,7 +1,8 @@
 //! Object file builder
 
-use crate::util::{diag, rv64};
-use crate::asm_riscv::{I, Reg};
+use crate::rv64;
+use crate::util::diag;
+use crate::rv32::{I, Reg};
 use crate::util::into_bytes::IntoBytes;
 use crate::reloc::{Reloc, PcrelPart, RelocKind};
 use crate::util::attr_builder::RiscvAttrsBuilder;

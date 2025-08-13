@@ -1,8 +1,8 @@
 //! RV64 extension for asm_riscv (RV32)
 
 use crate::util::misc;
+use crate::rv32::{I, Reg};
 use crate::util::opcode::AqRl;
-use crate::asm_riscv::{I, Reg};
 use crate::util::opcode::RV64Opcode::*;
 use crate::util::into_bytes::IntoBytes;
 

@@ -7,7 +7,8 @@
 pub mod util;
 
 pub mod asm;
+pub mod rv64;
 pub mod reloc;
 
 pub use object;
-pub use asm_riscv;
+pub use asm_riscv as rv32;
