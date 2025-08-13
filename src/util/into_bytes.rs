@@ -47,7 +47,7 @@ impl<'a, A: smallvec::Array<Item = u8>> IntoBytes<'a> for SmallVec<A> {
     }
 }
 
-impl<'a> IntoBytes<'a> for asm_riscv::I {
+impl<'a> IntoBytes<'a> for rv32::I {
     #[inline(always)]
     fn into_bytes(self) -> Cow<'a, [u8]> {
         u32::from(self).into_bytes()

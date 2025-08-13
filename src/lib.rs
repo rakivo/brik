@@ -15,5 +15,5 @@ pub mod asm;
 pub mod rv64;
 pub mod reloc;
 
+pub use rv32;
 pub use object;
-pub use asm_riscv as rv32;

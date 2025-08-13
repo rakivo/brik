@@ -561,7 +561,7 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline(always)]
-    pub fn emit_branch_to(&mut self, lbl_id: LabelId, i: asm_riscv::I) {
+    pub fn emit_branch_to(&mut self, lbl_id: LabelId, i: rv32::I) {
         let section_id = self.expect_curr_section();
         let offset = self.emit_bytes(i);
 
