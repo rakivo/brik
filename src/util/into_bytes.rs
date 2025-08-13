@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 
+use std::vec::Vec;
 use smallvec::SmallVec;
 
 /// Helper trait for converting T to bytes

@@ -2,7 +2,9 @@
 
 use crate::util::misc;
 
+use std::format;
 use std::sync::Arc;
+use std::string::String;
 
 use memchr::Memchr;
 use thiserror::Error;
@@ -19,7 +21,7 @@ use miette::{
 };
 
 /// A span representing a location in the source code (offset and length).
-#[derive(Debug, Clone, Copy)]
+#[derive(Copy, Debug, Clone)]
 pub struct BrikSourceSpan {
     pub offset: usize,
     pub length: usize,
@@ -136,6 +138,8 @@ pub struct DiagnosticRenderer;
 impl DiagnosticRenderer {
     #[inline]
     pub fn render_to_string(&self, diag: &UnplacedLabelDiagnostic) -> String {
+        use std::string::ToString;
+
         let src_name = diag.src.file_name();
         let src_content = diag.src.inner();
         let span_start = diag.span.offset;
@@ -324,4 +328,3 @@ pub fn calculate_byte_offset_large(text: &str, target_line: usize, target_col: u
     let final_offset = misc::b0(target_col, text.len() - search_start);
     search_start + final_offset
 }
-

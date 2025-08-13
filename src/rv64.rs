@@ -6,7 +6,7 @@ use crate::util::opcode::AqRl;
 use crate::util::opcode::RV64Opcode::*;
 use crate::util::into_bytes::IntoBytes;
 
-use std::mem;
+use core::mem;
 
 use smallvec::SmallVec;
 

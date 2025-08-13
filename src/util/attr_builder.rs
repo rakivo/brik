@@ -1,5 +1,8 @@
 //! Attribute builder for metadata sections (i.e. ".riscv.attributes")
 
+use std::vec::Vec;
+use std::borrow::ToOwned;
+
 /// Attribute builder for metadata sections (i.e. ".riscv.attributes")
 #[derive(Debug)]
 pub struct RiscvAttrsBuilder {

@@ -5,19 +5,24 @@ edition = "2024"
 authors = ["Mark Tyrkba <marktyrkba456@gmail.com>"]
 
 [dependencies]
-asm_riscv  = { version = "0.2.0",  default-features = false }
-smallvec   = { version = "1.15.1", default-features = false }
-thiserror  = { version = "1.0",    default-features = false }
-bytecount  = { version = "0.6.9",  default-features = false }
-memchr     = { version = "2.7.5",  default-features = false }
-paste      = { version = "1.0.15", default-features = false }
-rustc-hash = { version = "2.1.1",  default-features = false, features = ["std"] }
-object     = { version = "~0.37",  default-features = false, features = ["write"] }
-miette     = { version = "5",      default-features = false, features = ["fancy"], optional = true }
+asm_riscv  = { version = "0.2.0",   default-features = false }
+smallvec   = { version = "1.15.1",  default-features = false }
+thiserror  = { version = "2.0",     default-features = false }
+bytecount  = { version = "0.6.9",   default-features = false }
+memchr     = { version = "2.7.5",   default-features = false }
+paste      = { version = "1.0.15",  default-features = false }
+rustc-hash = { version = "2.1.1",   default-features = false, features = ["std"]   }
+object     = { version = "~0.37",   default-features = false, features = ["write"] }
+miette     = { version = "5",       default-features = false, features = ["fancy"], optional = true }
 
 [features]
-default = ["elf", "fancy-diagnostics"]
+# default = ["no_std"]
+default = ["std", "fancy-diagnostics"]
+
 fancy-diagnostics = ["miette/fancy"]
+
+no_std = []
+std = ["rustc-hash/std", "memchr/std", "object/std"]
 
 elf     = ["object/elf"]
 coff    = ["object/coff"]

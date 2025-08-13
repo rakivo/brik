@@ -3,6 +3,11 @@
 // TODO(#2): Implement F/D-extension: (single/double precision)
 // TODO(#4): Implement C-extension: (compressed instructions (16-bit))
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(not(feature = "std"))]
+pub(crate) extern crate alloc as std;
+
 #[macro_use]
 pub mod util;
 

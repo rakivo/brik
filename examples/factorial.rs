@@ -133,7 +133,7 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
         I::JAL { d: Reg::ZERO, im: 0 },
     );
 
-    asm.place_label_here(done_lbl);
+    // asm.place_label_here(done_lbl);
 
     // print result
     asm.emit_pcrel_load_addr(Reg::A0, result_fmt_sym);
