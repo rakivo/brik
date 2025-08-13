@@ -1,6 +1,6 @@
-use brik::util::rv64;
+use brik::rv64;
 use brik::asm::Assembler;
-use brik::asm_riscv::{I, Reg};
+use brik::rv32::{I, Reg};
 use brik::object::{
     Endianness,
     SymbolKind,
@@ -112,7 +112,7 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.emit_bytes(I::ADDI { d: Reg::S3, s: Reg::ZERO, im: 1 });
 
     let loop_lbl = asm.add_label_here(b".fact_loop");
-    let done_lbl = asm.add_label_here(b".fact_done");
+    let done_lbl = asm.declare_label(b".fact_done");
 
     // loop condition: if i > n, exit
     asm.emit_branch_to(

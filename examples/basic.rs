@@ -1,6 +1,6 @@
-use brik::util::rv64;
+use brik::rv64;
 use brik::asm::Assembler;
-use brik::asm_riscv::{I, Reg};
+use brik::rv32::{I, Reg};
 use brik::object::{
     Endianness,
     SymbolKind,
