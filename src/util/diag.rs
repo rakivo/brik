@@ -6,55 +6,171 @@ use std::sync::Arc;
 
 use memchr::Memchr;
 use thiserror::Error;
+
+#[cfg(feature = "fancy-diagnostics")]
 use miette::{
     Diagnostic,
     SourceSpan,
+    SourceCode,
     NamedSource,
+    MietteError,
+    SpanContents,
     GraphicalReportHandler,
 };
 
-/// `miette` diagnostic struct for rendering errors of unplaced labels
-#[derive(Debug, Error, Diagnostic)]
-#[error("unplaced label '{name}'")]
-pub struct UnplacedLabelDiagnostic {
-    /// Will be rendered above the snippet as the main error message
-    #[diagnostic(code(brik::unplaced_label))]
-    pub name: String,
-
-    /// The span inside `src` that should be highlighted
-    #[label("label never placed")]
-    pub span: SourceSpan,
-
-    /// The source file content (miette prints this)
-    #[source_code]
-    pub src: NamedSource
+/// A span representing a location in the source code (offset and length).
+#[derive(Debug, Clone, Copy)]
+pub struct BrikSourceSpan {
+    pub offset: usize,
+    pub length: usize,
 }
 
+impl BrikSourceSpan {
+    #[inline(always)]
+    pub const fn new(offset: usize, length: usize) -> Self {
+        Self { offset, length }
+    }
+}
+
+#[cfg(feature = "fancy-diagnostics")]
+impl From<BrikSourceSpan> for SourceSpan {
+    #[inline(always)]
+    fn from(span: BrikSourceSpan) -> Self {
+        SourceSpan::from(span.offset..span.offset + span.length)
+    }
+}
+
+/// A named source file with its content.
+#[derive(Debug, Clone)]
+pub struct BrikNamedSource {
+    pub name: Arc<str>,
+    pub source: Arc<str>,
+}
+
+impl BrikNamedSource {
+    #[inline(always)]
+    pub fn new(name: impl Into<Arc<str>>, content: impl Into<Arc<str>>) -> Self {
+        Self { name: name.into(), source: content.into() }
+    }
+
+    #[inline(always)]
+    pub fn file_name(&self) -> &str { &self.name }
+
+    #[inline(always)]
+    pub fn inner(&self) -> &str { &self.source }
+}
+
+#[cfg(feature = "fancy-diagnostics")]
+impl From<BrikNamedSource> for NamedSource {
+    #[inline(always)]
+    fn from(src: BrikNamedSource) -> Self {
+        NamedSource::new(src.name, src.source)
+    }
+}
+
+#[cfg(feature = "fancy-diagnostics")]
+impl SourceCode for BrikNamedSource {
+    #[inline(always)]
+    fn read_span<'a>(
+        &'a self,
+        span: &SourceSpan,
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+        self.source.read_span(span, context_lines_before, context_lines_after)
+    }
+}
+
+/// Diagnostic struct for rendering errors of unplaced labels.
+#[derive(Debug, Error)]
+#[cfg_attr(feature = "fancy-diagnostics", derive(Diagnostic))]
+#[error("unplaced label '{name}'")]
+pub struct UnplacedLabelDiagnostic {
+    /// The name of the unplaced label.
+    pub name: String,
+
+    /// The span where the label was referenced.
+    #[cfg_attr(feature = "fancy-diagnostics", label("label never placed"))]
+    pub span: BrikSourceSpan,
+
+    /// The source file content.
+    #[cfg_attr(feature = "fancy-diagnostics", source_code)]
+    pub src: BrikNamedSource,
+}
+
+#[cfg(feature = "fancy-diagnostics")]
 pub struct DiagnosticRenderer {
     handler: GraphicalReportHandler,
 }
 
+#[cfg(feature = "fancy-diagnostics")]
 impl Default for DiagnosticRenderer {
     #[inline(always)]
     fn default() -> Self {
-        Self { handler: GraphicalReportHandler::new() }
+        Self {
+            handler: GraphicalReportHandler::new(),
+        }
     }
 }
 
+#[cfg(feature = "fancy-diagnostics")]
 impl DiagnosticRenderer {
     const RENDERED_PREALLOCATION_SIZE: usize = 512;
 
     #[inline]
     pub fn render_to_string(&self, diag: &impl Diagnostic) -> String {
-        let mut rendered = String::with_capacity(
-            Self::RENDERED_PREALLOCATION_SIZE
-        );
-
+        let mut rendered = String::with_capacity(Self::RENDERED_PREALLOCATION_SIZE);
         self.handler
             .render_report(&mut rendered, diag)
             .expect("render_report should not fail");
 
         rendered
+    }
+}
+
+#[derive(Default)]
+#[cfg(not(feature = "fancy-diagnostics"))]
+pub struct DiagnosticRenderer;
+
+#[cfg(not(feature = "fancy-diagnostics"))]
+impl DiagnosticRenderer {
+    #[inline]
+    pub fn render_to_string(&self, diag: &UnplacedLabelDiagnostic) -> String {
+        let src_name = diag.src.file_name();
+        let src_content = diag.src.inner();
+        let span_start = diag.span.offset;
+        let span_len = diag.span.length;
+
+        let line_start = memchr::memrchr(b'\n', &src_content.as_bytes()[..span_start])
+            .map(|i| i + 1)
+            .unwrap_or(0);
+
+        let line_end = memchr::memchr(b'\n', &src_content.as_bytes()[span_start..])
+            .map(|i| span_start + i)
+            .unwrap_or(src_content.len());
+
+        let line = &src_content[line_start..line_end];
+        let line_number = bytecount::count(
+            &src_content.as_bytes()[..line_start],
+            b'\n'
+        ) + 1;
+
+        let column = span_start - line_start + 1;
+
+        // -> error
+        let caret = " ".repeat(column - 1) + &"^".repeat(span_len);
+
+        let line_number_str = line_number.to_string();
+        let line_number_pad = " ".repeat(line_number_str.len());
+
+        format!{
+            "error: unplaced label '{name}'\n  --> {src_name}:{lnum}:{c}\n{lpad} |\n{lstr} | {line}\n{lpad} | {caret}\n",
+            name = diag.name,
+            lnum = line_number,
+            c = column,
+            lpad = line_number_pad,
+            lstr = line_number_str,
+        }
     }
 }
 
@@ -71,14 +187,15 @@ const fn byte_offset_from_line_offsets(
 
 #[inline]
 pub fn text_into_named_source_and_span(
-    text      : impl Into<Arc<str>>,
+    text_     : impl AsRef<str> + Into<Arc<str>> + Clone,
     file_path : impl AsRef<str>,
 
     line          : usize,
     column        : usize,
     highlight_len : usize
-) -> (NamedSource, SourceSpan) {
-    let text = text.into();
+) -> (BrikNamedSource, BrikSourceSpan) {
+    let text = text_.as_ref();
+    let file_path = file_path.as_ref();
 
     if !text.is_empty() {
         const CONTENT_SIZE_THRESHOLD: usize = 10 * 1024;
@@ -92,13 +209,13 @@ pub fn text_into_named_source_and_span(
         };
 
         (
-            NamedSource::new(file_path, Arc::clone(&text)),
-            SourceSpan::new(byte_offset.into(), highlight_len.into()),
+            BrikNamedSource::new(file_path, text_.clone()),
+            BrikSourceSpan::new(byte_offset.into(), highlight_len.into()),
         )
     } else {
         (
-            NamedSource::new(file_path, ""),
-            SourceSpan::new(0.into(), 0.into())
+            BrikNamedSource::new(file_path, ""),
+            BrikSourceSpan::new(0, 0)
         )
     }
 }
