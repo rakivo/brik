@@ -42,6 +42,7 @@ pub mod util;
 pub mod asm;
 pub mod rv64;
 pub mod reloc;
+pub mod misc_enc;
 
 pub use rv32;
 pub use object;

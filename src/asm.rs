@@ -1,9 +1,9 @@
 //! Object file builder
 
-use crate::rv64;
 #[cfg(feature = "std")]
 use crate::util::diag;
 use crate::rv32::{I, Reg};
+use crate::{rv64, misc_enc};
 use crate::util::into_bytes::IntoBytes;
 use crate::reloc::{Reloc, PcrelPart, RelocKind};
 use crate::util::attr_builder::RiscvAttrsBuilder;
@@ -43,6 +43,7 @@ use core::{fmt, mem, panic};
 use core::ops::{Deref, DerefMut};
 
 use rustc_hash::FxHashMap;
+use num_traits::{PrimInt, Signed, Unsigned, FromPrimitive, ToPrimitive};
 
 #[derive(Eq, Ord, Hash, Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct LabelId(usize);
@@ -281,6 +282,42 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             v: u64
         ) -> u64 { self.emit_bytes_at(section, v) }
+    }
+
+    #[inline(always)]
+    pub fn emit_uleb_at<T>(&mut self, section: SectionId, value: T) -> u64
+    where
+        T: PrimInt + Unsigned + FromPrimitive + ToPrimitive
+    {
+        let bytes = misc_enc::leb128::encode_uleb128(value);
+        self.emit_bytes_at(section, bytes)
+    }
+
+    #[inline(always)]
+    pub fn emit_uleb<T>(&mut self, value: T) -> u64
+    where
+        T: PrimInt + Unsigned + FromPrimitive + ToPrimitive
+    {
+        let section = self.expect_curr_section();
+        self.emit_uleb_at(section, value)
+    }
+
+    #[inline(always)]
+    pub fn emit_sleb_at<T>(&mut self, section: SectionId, value: T) -> u64
+    where
+        T: PrimInt + Signed + FromPrimitive + ToPrimitive
+    {
+        let bytes = misc_enc::leb128::encode_sleb128(value);
+        self.emit_bytes_at(section, bytes)
+    }
+
+    #[inline(always)]
+    pub fn emit_sleb<T>(&mut self, value: T) -> u64
+    where
+        T: PrimInt + Signed + FromPrimitive + ToPrimitive
+    {
+        let section = self.expect_curr_section();
+        self.emit_sleb_at(section, value)
     }
 
     with_at! {
