@@ -247,7 +247,7 @@ impl<'a> Assembler<'a> {
 
     // ----- DATA/PADDING EMISSION HELPERS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_byte,
         #[inline(always)]
         pub fn emit_byte_at(
@@ -257,7 +257,7 @@ impl<'a> Assembler<'a> {
         ) -> u64 { self.emit_bytes_at(section, v) }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_half,
         #[inline(always)]
         pub fn emit_half_at(
@@ -267,7 +267,7 @@ impl<'a> Assembler<'a> {
         ) -> u64 { self.emit_bytes_at(section, v) }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_word,
         #[inline(always)]
         pub fn emit_word_at(
@@ -277,7 +277,7 @@ impl<'a> Assembler<'a> {
         ) -> u64 { self.emit_bytes_at(section, v) }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_dword,
         #[inline(always)]
         pub fn emit_dword_at(
@@ -287,7 +287,7 @@ impl<'a> Assembler<'a> {
         ) -> u64 { self.emit_bytes_at(section, v) }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_str,
         #[inline(always)]
         pub fn emit_str_at(
@@ -297,7 +297,7 @@ impl<'a> Assembler<'a> {
         ) -> u64 { self.emit_bytes_at(section, s.as_bytes()) }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_string,
         #[inline(always)]
         pub fn emit_string_at(
@@ -307,7 +307,7 @@ impl<'a> Assembler<'a> {
         ) -> u64 { self.emit_bytes_at(section, s.into_bytes()) }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_strz,
         #[inline(always)]
         pub fn emit_strz_at(
@@ -320,7 +320,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_stringz,
         #[inline(always)]
         pub fn emit_stringz_at(
@@ -333,7 +333,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_zeroes,
         #[inline(always)]
         pub fn emit_zeroes_at(
@@ -345,7 +345,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_fill,
         #[inline(always)]
         pub fn emit_fill_at(
@@ -692,7 +692,7 @@ impl<'a> Assembler<'a> {
         self.relocs = new_relocs;
     }
 
-    at_and_no_at!{
+    with_at!{
         emit_branch_to,
         #[inline(always)]
         pub fn emit_branch_to_at(
@@ -827,7 +827,7 @@ impl<'a> Assembler<'a> {
         })
     }
 
-    at_and_no_at!{
+    with_at!{
         emit_bytes,
         #[inline(always)]
         pub fn emit_bytes_at(
@@ -838,12 +838,12 @@ impl<'a> Assembler<'a> {
             self.obj.append_section_data(
                 section,
                 &data.into_bytes(),
-                1, // align
+                1 // align
             )
         }
     }
 
-    at_and_no_at!{
+    with_at!{
         emit_bytes_with_reloc,
         #[inline]
         pub fn emit_bytes_with_reloc_at(
@@ -871,7 +871,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at!{
+    with_at!{
         create_pcrel_hi_label,
         #[inline]
         pub fn create_pcrel_hi_label_at(
@@ -891,7 +891,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_function_prologue,
         #[inline]
         pub fn emit_function_prologue_at(&mut self, section: SectionId) -> u64 {
@@ -908,7 +908,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_function_epilogue,
         #[inline]
         pub fn emit_function_epilogue_at(&mut self, section: SectionId) -> u64 {
@@ -923,7 +923,7 @@ impl<'a> Assembler<'a> {
 
     // ----- OPS EMISSION -----
 
-    at_and_no_at! {
+    with_at! {
         emit_pcrel_load_addr,
         #[inline]
         pub fn emit_pcrel_load_addr_at(
@@ -946,7 +946,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_call_plt,
         #[inline]
         pub fn emit_call_plt_at(
@@ -963,7 +963,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_call_direct,
         #[inline]
         pub fn emit_call_direct_at(
@@ -980,7 +980,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_return_imm,
         #[inline(always)]
         pub fn emit_return_imm_at(
@@ -996,7 +996,7 @@ impl<'a> Assembler<'a> {
 
     // ----- LOAD/STORE OPERATIONS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_lb,
         /// Emit load byte (LB)
         #[inline(always)]
@@ -1011,7 +1011,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_lh,
         /// Emit load halfword (LH)
         #[inline(always)]
@@ -1026,7 +1026,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_lw,
         /// Emit load word (LW)
         #[inline(always)]
@@ -1041,7 +1041,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_ld,
         /// Emit load doubleword (LD) - RV64 only
         #[inline(always)]
@@ -1056,7 +1056,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sb,
         /// Emit store byte (SB)
         #[inline(always)]
@@ -1071,7 +1071,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sh,
         /// Emit store halfword (SH)
         #[inline(always)]
@@ -1086,7 +1086,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sw,
         /// Emit store word (SW)
         #[inline(always)]
@@ -1101,7 +1101,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sd,
         /// Emit store doubleword (SD) - RV64 only
         #[inline(always)]
@@ -1118,7 +1118,7 @@ impl<'a> Assembler<'a> {
 
     // ----- ARITHMETIC OPERATIONS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_add,
         /// Emit ADD instruction
         #[inline(always)]
@@ -1133,7 +1133,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sub,
         /// Emit SUB instruction
         #[inline(always)]
@@ -1148,7 +1148,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_addi,
         /// Emit ADDI instruction
         #[inline(always)]
@@ -1163,7 +1163,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_li,
         /// Load immediate value into register (pseudo-instruction)
         #[inline(always)]
@@ -1178,7 +1178,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_mv,
         /// Move register to register (pseudo-instruction: ADDI rd, rs, 0)
         #[inline(always)]
@@ -1194,7 +1194,7 @@ impl<'a> Assembler<'a> {
 
     // ----- LOGICAL OPERATIONS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_and,
         #[inline(always)]
         pub fn emit_and_at(
@@ -1208,7 +1208,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_or,
         #[inline(always)]
         pub fn emit_or_at(
@@ -1222,7 +1222,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_xor,
         #[inline(always)]
         pub fn emit_xor_at(
@@ -1236,7 +1236,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_andi,
         #[inline(always)]
         pub fn emit_andi_at(
@@ -1250,7 +1250,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_ori,
         #[inline(always)]
         pub fn emit_ori_at(
@@ -1264,7 +1264,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_xori,
         #[inline(always)]
         pub fn emit_xori_at(
@@ -1280,7 +1280,7 @@ impl<'a> Assembler<'a> {
 
     // ----- SHIFT OPERATIONS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_sll,
         #[inline(always)]
         pub fn emit_sll_at(
@@ -1294,7 +1294,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_srl,
         #[inline(always)]
         pub fn emit_srl_at(
@@ -1308,7 +1308,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sra,
         #[inline(always)]
         pub fn emit_sra_at(
@@ -1322,7 +1322,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_slli,
         #[inline(always)]
         pub fn emit_slli_at(
@@ -1336,7 +1336,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_srli,
         #[inline(always)]
         pub fn emit_srli_at(
@@ -1350,7 +1350,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_srai,
         #[inline(always)]
         pub fn emit_srai_at(
@@ -1366,7 +1366,7 @@ impl<'a> Assembler<'a> {
 
     // ----- COMPARISON OPERATIONS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_slt,
         #[inline(always)]
         pub fn emit_slt_at(
@@ -1380,7 +1380,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_sltu,
         #[inline(always)]
         pub fn emit_sltu_at(
@@ -1394,7 +1394,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_slti,
         #[inline(always)]
         pub fn emit_slti_at(
@@ -1408,9 +1408,95 @@ impl<'a> Assembler<'a> {
         }
     }
 
+    // ----- BRANCHING OPERATIONS -----
+
+    with_at! {
+        emit_beq,
+        #[inline(always)]
+        pub fn emit_beq_at(
+            &mut self,
+            section: SectionId,
+            rs1: Reg,
+            rs2: Reg,
+            label: LabelId
+        ) -> u64 {
+            self.emit_branch_to_at(section, label, I::BEQ { s1: rs1, s2: rs2, im: 0 })
+        }
+    }
+
+    with_at! {
+        emit_bne,
+        #[inline(always)]
+        pub fn emit_bne_at(
+            &mut self,
+            section: SectionId,
+            rs1: Reg,
+            rs2: Reg,
+            label: LabelId
+        ) -> u64 {
+            self.emit_branch_to_at(section, label, I::BNE { s1: rs1, s2: rs2, im: 0 })
+        }
+    }
+
+    with_at! {
+        emit_blt,
+        #[inline(always)]
+        pub fn emit_blt_at(
+            &mut self,
+            section: SectionId,
+            rs1: Reg,
+            rs2: Reg,
+            label: LabelId
+        ) -> u64 {
+            self.emit_branch_to_at(section, label, I::BLT { s1: rs1, s2: rs2, im: 0 })
+        }
+    }
+
+    with_at! {
+        emit_bge,
+        #[inline(always)]
+        pub fn emit_bge_at(
+            &mut self,
+            section: SectionId,
+            rs1: Reg,
+            rs2: Reg,
+            label: LabelId
+        ) -> u64 {
+            self.emit_branch_to_at(section, label, I::BGE { s1: rs1, s2: rs2, im: 0 })
+        }
+    }
+
+    with_at! {
+        emit_bltu,
+        #[inline(always)]
+        pub fn emit_bltu_at(
+            &mut self,
+            section: SectionId,
+            rs1: Reg,
+            rs2: Reg,
+            label: LabelId
+        ) -> u64 {
+            self.emit_branch_to_at(section, label, I::BLTU { s1: rs1, s2: rs2, im: 0 })
+        }
+    }
+
+    with_at! {
+        emit_bgeu,
+        #[inline(always)]
+        pub fn emit_bgeu_at(
+            &mut self,
+            section: SectionId,
+            rs1: Reg,
+            rs2: Reg,
+            label: LabelId
+        ) -> u64 {
+            self.emit_branch_to_at(section, label, I::BGEU { s1: rs1, s2: rs2, im: 0 })
+        }
+    }
+
     // ----- JUMP OPERATIONS -----
 
-    at_and_no_at! {
+    with_at! {
         emit_jal,
         #[inline(always)]
         pub fn emit_jal_at(
@@ -1423,7 +1509,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_jalr,
         #[inline(always)]
         pub fn emit_jalr_at(
@@ -1441,7 +1527,7 @@ impl<'a> Assembler<'a> {
 
     // --- JUMP OPERATIONS ---
 
-    at_and_no_at! {
+    with_at! {
         emit_j,
         /// Jump to label (pseudo-instruction: JAL x0, label)
         #[inline(always)]
@@ -1454,7 +1540,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_ret,
         /// Return from function (pseudo-instruction: JALR x0, ra, 0)
         #[inline(always)]
@@ -1466,7 +1552,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_nop,
         /// No operation (ADDI x0, x0, 0)
         #[inline(always)]
@@ -1478,7 +1564,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_push,
         /// Push register onto stack
         #[inline(always)]
@@ -1492,7 +1578,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    at_and_no_at! {
+    with_at! {
         emit_pop,
         /// Pop register from stack
         #[inline(always)]

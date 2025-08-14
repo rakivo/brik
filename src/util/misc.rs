@@ -85,7 +85,7 @@ macro_rules! with_at_end {
     };
 }
 
-macro_rules! at_and_no_at {
+macro_rules! with_at {
     (
         $no_at_name: ident,
         $(#[$meta:meta])*
