@@ -645,7 +645,9 @@ impl<'a> Assembler<'a> {
             offset,
             0,
             SymbolKind::Text,
-            SymbolScope::Compilation
+            SymbolScope::Compilation,
+            false,
+            SymbolFlags::None
         );
 
         Label { sym }
@@ -916,12 +918,13 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    pub fn add_common_symbol_at(
+    pub fn add_comm_symbol_at(
         &mut self,
         section: SymbolSection,
         name: &[u8],
         size: u64,
-        align: u64
+        align: u64,
+        weak: bool
     ) -> SymbolId {
         self.obj.add_common_symbol(
             Symbol {
@@ -930,7 +933,7 @@ impl<'a> Assembler<'a> {
                 size,
                 kind: SymbolKind::Data,
                 scope: SymbolScope::Linkage,
-                weak: false,
+                weak,
                 section,
                 flags: SymbolFlags::None
             },
@@ -940,14 +943,59 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    pub fn add_common_symbol(
+    pub fn add_comm_symbol(
         &mut self,
         name: &[u8],
         size: u64,
-        align: u64
+        align: u64,
+        weak: bool
     ) -> SymbolId {
-        self.add_common_symbol_at(
-            SymbolSection::Common, name, size, align
+        self.add_comm_symbol_at(
+            SymbolSection::Common, name, size, align, weak
+        )
+    }
+
+    #[inline]
+    pub fn define_data_at(
+        &mut self,
+        section: SymbolSection,
+        name: impl AsRef<[u8]>,
+        data: impl IntoBytes<'a>
+    ) -> SymbolId {
+        let offset = self.curr_offset();
+        let bytes = data.into_bytes();
+        let size = bytes.len() as _;
+        self.emit_bytes(bytes);
+        self.add_symbol_at(
+            section,
+            name.as_ref(),
+            offset,
+            size,
+            SymbolKind::Data,
+            SymbolScope::Compilation,
+            false, // strong
+            SymbolFlags::None
+        )
+    }
+
+    #[inline]
+    pub fn define_data(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        data: impl IntoBytes<'a>
+    ) -> SymbolId {
+        let offset = self.curr_offset();
+        let bytes = data.into_bytes();
+        let size = bytes.len() as _;
+        self.emit_bytes(bytes);
+        self.add_symbol(
+            name.as_ref(),
+            offset,
+            size,
+            SymbolKind::Data,
+            SymbolScope::Compilation,
+            false, // strong
+            SymbolFlags::None
         )
     }
 
@@ -958,21 +1006,23 @@ impl<'a> Assembler<'a> {
         pub fn add_symbol_at(
             &mut self,
             section: SymbolSection,
-            name: &[u8],
+            name: impl AsRef<[u8]>,
             value: u64,
             size: u64,
             kind: SymbolKind,
             scope: SymbolScope,
+            weak: bool,
+            flags: SymbolFlags<SectionId, SymbolId>
         ) -> SymbolId {
             self.obj.add_symbol(Symbol {
-                name: name.to_vec(),
+                name: name.as_ref().to_owned(),
                 value,
                 size,
                 kind,
                 scope,
-                weak: false,
+                weak,
                 section,
-                flags: SymbolFlags::None,
+                flags
             })
         }
     }
@@ -1056,6 +1106,8 @@ impl<'a> Assembler<'a> {
                 0,
                 SymbolKind::Label,
                 SymbolScope::Compilation,
+                false,
+                SymbolFlags::None
             )
         }
     }

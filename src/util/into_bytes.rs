@@ -42,6 +42,13 @@ impl<'a> IntoBytes<'a> for Vec<u8> {
     }
 }
 
+impl<'a> IntoBytes<'a> for Cow<'a, [u8]> {
+    #[inline(always)]
+    fn into_bytes(self) -> Cow<'a, [u8]> {
+        self
+    }
+}
+
 impl<'a, A: smallvec::Array<Item = u8>> IntoBytes<'a> for SmallVec<A> {
     #[inline(always)]
     fn into_bytes(self) -> Cow<'a, [u8]> {

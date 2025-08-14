@@ -68,16 +68,27 @@ macro_rules! debug_from_display {
 macro_rules! with_at_end {
     (
         $(#[$meta:meta])*
-        $vis:vis fn $name:ident(
+        $vis:vis fn $name:ident
+        $(<$($generics:tt),*>)?
+        (
             &mut $self:ident $(, $param_name:ident: $param_type:ty $(,)?)*
         ) $(-> $ret:ty)? $body:block
     ) => {
         $(#[$meta])*
-        $vis fn $name(&mut $self $(, $param_name: $param_type)*) $(-> $ret)? $body
+        $vis fn $name
+        $(<$($generics),*>)?
+        (&mut $self $(, $param_name: $param_type)*)
+        $(-> $ret)?
+        $body
 
+        // TODO: Stop using paste in macros as it is bad for lsp jumping
         paste::paste! {
             #[inline(always)]
-            $vis fn [<$name _at_end>](&mut $self $(, $param_name: $param_type)*) $(-> $ret)? {
+            $vis fn [<$name _at_end>]
+            $(<$($generics),*>)?
+            (&mut $self $(, $param_name: $param_type)*)
+            $(-> $ret)?
+            {
                 let sid = $self.$name($($param_name),*);
                 $self.position_at_end(sid);
                 sid
@@ -92,19 +103,27 @@ macro_rules! with_no_at {
     (
         $no_at_name: ident,
         $(#[$meta:meta])*
-        pub fn $name_at:ident (
+        pub fn $name_at:ident
+        $(<$($generics:tt),*>)?
+        (
             &mut $self:ident,
             $section:ident: $section_type:ty $(, $arg:ident: $ty:ty $(,)?)*
         ) $(-> $ret:ty)? $body:block
     ) => {
         $(#[$meta])*
-        pub fn $name_at(
+        pub fn $name_at
+        $(<$($generics),*>)?
+        (
             &mut $self, $section: $section_type $(, $arg: $ty)*
         ) $(-> $ret)? $body
 
         #[track_caller]
         #[inline(always)]
-        pub fn $no_at_name(&mut $self $(, $arg: $ty)*) $(-> $ret)? {
+        pub fn $no_at_name
+        $(<$($generics),*>)?
+        (&mut $self $(, $arg: $ty)*)
+        $(-> $ret)?
+        {
             let $section = $self.expect_curr_section();
             $self.$name_at($section $(, $arg)*)
         }
@@ -115,23 +134,30 @@ macro_rules! with_no_at {
         symbol
         $no_at_name: ident,
         $(#[$meta:meta])*
-        pub fn $name_at:ident (
+        pub fn $name_at:ident
+        $(<$($generics:tt),*>)?
+        (
             &mut $self:ident,
             $section:ident: $section_type:ty $(, $arg:ident: $ty:ty $(,)?)*
         ) $(-> $ret:ty)? $body:block
     ) => {
         $(#[$meta])*
-        pub fn $name_at(
+        pub fn $name_at
+        $(<$($generics),*>)?
+        (
             &mut $self, $section: $section_type $(, $arg: $ty)*
         ) $(-> $ret)? $body
 
         #[track_caller]
         #[inline(always)]
-        pub fn $no_at_name(&mut $self $(, $arg: $ty)*) $(-> $ret)? {
+        pub fn $no_at_name
+        $(<$($generics),*>)?
+        (&mut $self $(, $arg: $ty)*)
+        $(-> $ret)?
+        {
             let $section = $self.expect_curr_section();
             let $section = $crate::object::write::SymbolSection::Section($section);
             $self.$name_at($section $(, $arg)*)
         }
     };
-
 }
