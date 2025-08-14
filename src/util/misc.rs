@@ -64,7 +64,6 @@ macro_rules! debug_from_display {
     };
 }
 
-#[doc(hidden)]
 macro_rules! with_at_end {
     (
         $(#[$meta:meta])*
@@ -82,6 +81,29 @@ macro_rules! with_at_end {
                 $self.position_at_end(sid);
                 sid
             }
+        }
+    };
+}
+
+macro_rules! at_and_no_at {
+    (
+        $no_at_name: ident,
+        $(#[$meta:meta])*
+        pub fn $name_at:ident (
+            &mut $self:ident,
+            $section:ident: SectionId $(, $arg:ident: $ty:ty $(,)?)*
+        ) $(-> $ret:ty)? $body:block
+    ) => {
+        $(#[$meta])*
+        pub fn $name_at(
+            &mut $self, $section: SectionId $(, $arg: $ty)*
+        ) $(-> $ret)? $body
+
+        #[track_caller]
+        #[inline(always)]
+        pub fn $no_at_name(&mut $self $(, $arg: $ty)*) $(-> $ret)? {
+            let $section = $self.expect_curr_section();
+            $self.$name_at($section $(, $arg)*)
         }
     };
 }
