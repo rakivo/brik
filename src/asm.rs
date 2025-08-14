@@ -1,5 +1,6 @@
 //! Object file builder
 
+use crate::rv32;
 #[cfg(feature = "std")]
 use crate::util::diag;
 use crate::rv32::{I, Reg};
@@ -43,7 +44,13 @@ use core::{fmt, mem, panic};
 use core::ops::{Deref, DerefMut};
 
 use rustc_hash::FxHashMap;
-use num_traits::{PrimInt, Signed, Unsigned, FromPrimitive, ToPrimitive};
+use num_traits::{
+    Signed,
+    PrimInt,
+    Unsigned,
+    ToPrimitive,
+    FromPrimitive,
+};
 
 #[derive(Eq, Ord, Hash, Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct LabelId(usize);
@@ -388,6 +395,118 @@ impl<'a> Assembler<'a> {
             value: u8
         ) -> u64 {
             self.emit_bytes_at(section, vec![value; count])
+        }
+    }
+
+    // ----- RAW INSTRUCTION EMISSION HELPERS -----
+
+    with_at! {
+        emit_r,
+        #[inline(always)]
+        pub fn emit_r_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            d: Reg,
+            funct3: u32,
+            s1: Reg,
+            s2: Reg,
+            funct7: u32
+        ) -> u64 {
+            self.emit_bytes_at(section, I::r(opcode, d, funct3, s1, s2, funct7))
+        }
+    }
+
+    with_at! {
+        emit_i,
+        #[inline(always)]
+        pub fn emit_i_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            d: Reg,
+            funct3: u32,
+            s: Reg,
+            im: i16
+        ) -> u64 {
+            self.emit_bytes_at(section, I::i(opcode, d, funct3, s, im))
+        }
+    }
+
+    with_at! {
+        emit_i7,
+        #[inline(always)]
+        pub fn emit_i7_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            d: Reg,
+            funct3: u32,
+            s: Reg,
+            im: i8,
+            funct7: u32
+        ) -> u64 {
+            self.emit_bytes_at(section, I::i7(opcode, d, funct3, s, im, funct7))
+        }
+    }
+
+    with_at! {
+        emit_s,
+        #[inline(always)]
+        pub fn emit_s_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            funct3: u32,
+            s1: Reg,
+            s2: Reg,
+            im: i16
+        ) -> u64 {
+            self.emit_bytes_at(section, I::s(opcode, funct3, s1, s2, im))
+        }
+    }
+
+    with_at! {
+        emit_b,
+        #[inline(always)]
+        pub fn emit_b_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            funct3: u32,
+            s1: Reg,
+            s2: Reg,
+            im_b: i16
+        ) -> u64 {
+            self.emit_bytes_at(section, I::b(opcode, funct3, s1, s2, im_b))
+        }
+    }
+
+    with_at! {
+        emit_u,
+        #[inline(always)]
+        pub fn emit_u_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            d: Reg,
+            im: i32
+        ) -> u64 {
+            self.emit_bytes_at(section, I::u(opcode, d, im))
+        }
+    }
+
+    with_at! {
+        emit_j,
+        #[inline(always)]
+        pub fn emit_j_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            d: Reg,
+            im_j: i32
+        ) -> u64 {
+            self.emit_bytes_at(section, I::j(opcode, d, im_j))
         }
     }
 
@@ -1561,10 +1680,10 @@ impl<'a> Assembler<'a> {
     // --- JUMP OPERATIONS ---
 
     with_at! {
-        emit_j,
+        emit_jmp,
         /// Jump to label (pseudo-instruction: JAL x0, label)
         #[inline(always)]
-        pub fn emit_j_at(
+        pub fn emit_jmp_at(
             &mut self,
             section: SectionId,
             lbl_id: LabelId

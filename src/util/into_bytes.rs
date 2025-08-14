@@ -1,8 +1,10 @@
 //! Helper trait for converting T to bytes
 
-use std::borrow::Cow;
+use crate::rv32;
 
 use std::vec::Vec;
+use std::borrow::Cow;
+
 use smallvec::SmallVec;
 
 /// Helper trait for converting T to bytes

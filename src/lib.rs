@@ -43,5 +43,5 @@ pub mod rv64;
 pub mod reloc;
 pub mod misc_enc;
 
-pub use rv32;
 pub use object;
+pub use brik_rv32 as rv32;
