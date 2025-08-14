@@ -1,4 +1,5 @@
 // TODO(#1): Implement tests
+// TODO(#9): `Imm` enum for convenient im usage
 // TODO(#2): Implement F/D-extension: (single/double precision)
 // TODO(#4): Implement C-extension: (compressed instructions (16-bit))
 
