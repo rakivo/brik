@@ -22,10 +22,6 @@
 // TODO(#15): Support MACH-O/COFF relocation kinds
 // TODO(#16): Implement API for emission of `.comm`
 // TODO(#17): Implement API for emission of `pic/nopic`, `relax/norelax`
-// TODO(#18): Implement API for emission of `.insn`
-//   Allow user to specify the raw opcode/bytes of an instruction by format/type.
-//   GNU as supports `.insn` to manually encode instructions matching this exactly
-//   is lower priority, but at minimum support emitting a 32‑bit word with .word 0x... for unrecognized or special cases.
 // TODO(#9): `Imm` enum for convenient im usage
 // TODO(#2): Implement F/D-extension: (single/double precision)
 // TODO(#4): Implement C-extension: (compressed instructions (16-bit))
