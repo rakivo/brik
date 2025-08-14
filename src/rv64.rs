@@ -19,8 +19,8 @@ pub type RV64Inst = SmallVec<[u8; mem::size_of::<u32>() * 6]>;
 ///
 /// Runnable check for an LD with offset 0:
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_ld;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_ld;
 /// let inst = encode_ld(Reg::S1, Reg::S2, 0);
 /// assert_eq!(inst, 0x093483); // LD a0, 0(sp)
 /// ```
@@ -41,8 +41,8 @@ pub const fn encode_ld(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_sd;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_sd;
 /// let inst = encode_sd(Reg::A0, Reg::SP, 0);
 /// assert_eq!(inst, 0xa13023); // sd a0, 0(sp)
 /// ```
@@ -65,8 +65,8 @@ pub const fn encode_sd(rs2: Reg, rs1: Reg, imm: i16) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_li_rv64_little;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_li_rv64_little;
 ///
 /// // imm fits into 12 bits
 /// let bytes = encode_li_rv64_little(Reg::A0, 42);
@@ -119,8 +119,8 @@ pub fn encode_li_rv64_little(rd: Reg, imm: i64) -> RV64Inst {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_div;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_div;
 /// let inst = encode_div(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02c5c533); // div a0, a1, a2
 /// ```
@@ -139,8 +139,8 @@ pub const fn encode_div(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_divw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_divw;
 /// let inst = encode_divw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5C53B); // divw a0, a1, a2
 /// ```
@@ -159,8 +159,8 @@ pub const fn encode_divw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_divu;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_divu;
 /// let inst = encode_divu(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5D533); // divu a0, a1, a2
 /// ```
@@ -179,8 +179,8 @@ pub const fn encode_divu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_divuw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_divuw;
 /// let inst = encode_divuw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5D53B); // divuw a0, a1, a2
 /// ```
@@ -198,8 +198,8 @@ pub const fn encode_divuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_rem;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_rem;
 /// let inst = encode_rem(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02c5e533); // rem a0, a1, a2
 /// ```
@@ -218,8 +218,8 @@ pub const fn encode_rem(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_remw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_remw;
 /// let inst = encode_remw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5E53B); // remw a0, a1, a2
 /// ```
@@ -238,8 +238,8 @@ pub const fn encode_remw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_remu;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_remu;
 /// let inst = encode_remu(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5F533); // remu a0, a1, a2
 /// ```
@@ -258,8 +258,8 @@ pub const fn encode_remu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_remuw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_remuw;
 /// let inst = encode_remuw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5F53B); // remuw a0, a1, a2
 /// ```
@@ -277,8 +277,8 @@ pub const fn encode_remuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mul;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mul;
 /// let inst = encode_mul(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02c58533); // mul a0, a1, a2
 /// ```
@@ -298,8 +298,8 @@ pub const fn encode_mul(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulw;
 /// let inst = encode_mulw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5853B); // mulw a0, a1, a2
 /// ```
@@ -319,8 +319,8 @@ pub const fn encode_mulw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulhw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulhw;
 /// let inst = encode_mulhw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5953B); // mulhw a0, a1, a2
 /// ```
@@ -339,8 +339,8 @@ pub const fn encode_mulhw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulhsuw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulhsuw;
 /// let inst = encode_mulhsuw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5A53B); // mulhsuw a0, a1, a2
 /// ```
@@ -359,8 +359,8 @@ pub const fn encode_mulhsuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulhuw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulhuw;
 /// let inst = encode_mulhuw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5B53B); // mulhuw a0, a1, a2
 /// ```
@@ -379,8 +379,8 @@ pub const fn encode_mulhuw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulh;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulh;
 /// let inst = encode_mulh(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C59533); // mulh a0, a1, a2
 /// ```
@@ -399,8 +399,8 @@ pub const fn encode_mulh(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulhsu;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulhsu;
 /// let inst = encode_mulhsu(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5A533); // mulhsu a0, a1, a2
 /// ```
@@ -419,8 +419,8 @@ pub const fn encode_mulhsu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_mulhu;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_mulhu;
 /// let inst = encode_mulhu(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0x02C5B533); // mulhu a0, a1, a2
 /// ```
@@ -443,8 +443,8 @@ pub const fn encode_mulhu(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_addw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_addw;
 /// let inst = encode_addw(Reg::A0, Reg::A1, Reg::A2);
 /// assert_eq!(inst, 0xc5853b);
 /// // addw a0, a1, a2
@@ -467,8 +467,8 @@ pub const fn encode_addw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_subw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_subw;
 /// assert_eq!(encode_subw(Reg::A0, Reg::A1, Reg::A2), 0x40c5853b);
 /// ```
 #[inline(always)]
@@ -488,8 +488,8 @@ pub const fn encode_subw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_addiw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_addiw;
 /// let inst = encode_addiw(Reg::A0, Reg::A1, 42);
 /// assert_eq!(inst, 0x2a5851b);
 /// // addiw a0, a1, 42
@@ -511,8 +511,8 @@ pub const fn encode_addiw(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_sllw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_sllw;
 /// assert_eq!(encode_sllw(Reg::A0, Reg::A1, Reg::A2), 0xc5953b);
 /// ```
 #[inline(always)]
@@ -532,8 +532,8 @@ pub const fn encode_sllw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_srlw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_srlw;
 /// assert_eq!(encode_srlw(Reg::A0, Reg::A1, Reg::A2), 0xc5d53b);
 /// ```
 #[inline(always)]
@@ -553,8 +553,8 @@ pub const fn encode_srlw(rd: Reg, rs1: Reg, rs2: Reg) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_sraw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_sraw;
 /// assert_eq!(encode_sraw(Reg::A0, Reg::A1, Reg::A2), 0x40c5d53b);
 /// ```
 #[inline(always)]
@@ -575,8 +575,8 @@ const fn const_32_contains_shamt_(shamt: i8) -> bool {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_slliw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_slliw;
 /// assert_eq!(encode_slliw(Reg::A0, Reg::A1, 4), 0x45951b);
 /// ```
 #[inline(always)]
@@ -594,8 +594,8 @@ pub const fn encode_slliw(rd: Reg, rs1: Reg, shamt: i8) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_srliw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_srliw;
 /// assert_eq!(encode_srliw(Reg::A0, Reg::A1, 4), 0x45d51b);
 /// ```
 #[inline(always)]
@@ -612,8 +612,8 @@ pub const fn encode_srliw(rd: Reg, rs1: Reg, shamt: i8) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_sraiw;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_sraiw;
 /// assert_eq!(encode_sraiw(Reg::A0, Reg::A1, 4), 0x4045d51b);
 /// ```
 #[inline(always)]
@@ -633,8 +633,8 @@ pub const fn encode_sraiw(rd: Reg, rs1: Reg, shamt: i8) -> u32 {
 /// # Example
 ///
 /// ```rust
-/// use brik::asm_riscv::Reg;
-/// use brik::util::rv64::encode_lwu;
+/// use brik::rv32::Reg;
+/// use brik::rv64::encode_lwu;
 /// assert_eq!(encode_lwu(Reg::A0, Reg::SP, 0), 0x16503);
 /// ```
 #[inline(always)]
@@ -655,9 +655,9 @@ pub const fn encode_lwu(rd: Reg, rs1: Reg, imm: i16) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_lr_w;
+/// use brik::rv64::encode_lr_w;
 /// let inst = encode_lr_w(Reg::A0, Reg::A1, AqRl::None);
 /// assert_eq!(inst, 0x1005A52F); // lr.w a0, (a1)
 /// ```
@@ -679,9 +679,9 @@ pub const fn encode_lr_w(rd: Reg, rs1: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_sc_w;
+/// use brik::rv64::encode_sc_w;
 /// let inst = encode_sc_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x18C5A52F); // sc.w a0, a2, (a1)
 /// ```
@@ -702,9 +702,9 @@ pub const fn encode_sc_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_lr_d;
+/// use brik::rv64::encode_lr_d;
 /// let inst = encode_lr_d(Reg::A0, Reg::A1, AqRl::None);
 /// assert_eq!(inst, 0x1005B52F); // lr.d a0, (a1)
 /// ```
@@ -726,9 +726,9 @@ pub const fn encode_lr_d(rd: Reg, rs1: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_sc_d;
+/// use brik::rv64::encode_sc_d;
 /// let inst = encode_sc_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x18C5B52F); // sc.d a0, a2, (a1)
 /// ```
@@ -751,9 +751,9 @@ pub const fn encode_sc_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoadd_w;
+/// use brik::rv64::encode_amoadd_w;
 /// let inst = encode_amoadd_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x00C5A52F); // amoadd.w a0, a2, (a1)
 /// ```
@@ -775,9 +775,9 @@ pub const fn encode_amoadd_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoswap_w;
+/// use brik::rv64::encode_amoswap_w;
 /// let inst = encode_amoswap_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x08C5A52F); // amoswap.w a0, a2, (a1)
 /// ```
@@ -798,9 +798,9 @@ pub const fn encode_amoswap_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoand_w;
+/// use brik::rv64::encode_amoand_w;
 /// let inst = encode_amoand_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x60C5A52F); // amoand.w a0, a2, (a1)
 /// ```
@@ -821,9 +821,9 @@ pub const fn encode_amoand_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoor_w;
+/// use brik::rv64::encode_amoor_w;
 /// let inst = encode_amoor_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x40C5A52F); // amoor.w a0, a2, (a1)
 /// ```
@@ -844,9 +844,9 @@ pub const fn encode_amoor_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoxor_w;
+/// use brik::rv64::encode_amoxor_w;
 /// let inst = encode_amoxor_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x20C5A52F); // amoxor.w a0, a2, (a1)
 /// ```
@@ -867,9 +867,9 @@ pub const fn encode_amoxor_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amomax_w;
+/// use brik::rv64::encode_amomax_w;
 /// let inst = encode_amomax_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0xA0C5A52F); // amomax.w a0, a2, (a1)
 /// ```
@@ -890,9 +890,9 @@ pub const fn encode_amomax_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amomin_w;
+/// use brik::rv64::encode_amomin_w;
 /// let inst = encode_amomin_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x80C5A52F); // amomin.w a0, a2, (a1)
 /// ```
@@ -913,9 +913,9 @@ pub const fn encode_amomin_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amomaxu_w;
+/// use brik::rv64::encode_amomaxu_w;
 /// let inst = encode_amomaxu_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0xE0C5A52F); // amomaxu.w a0, a2, (a1)
 /// ```
@@ -936,9 +936,9 @@ pub const fn encode_amomaxu_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amominu_w;
+/// use brik::rv64::encode_amominu_w;
 /// let inst = encode_amominu_w(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0xC0C5A52F); // amominu.w a0, a2, (a1)
 /// ```
@@ -962,9 +962,9 @@ pub const fn encode_amominu_w(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 /// # Example
 ///
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoadd_d;
+/// use brik::rv64::encode_amoadd_d;
 /// let inst = encode_amoadd_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x00C5B52F); // amoadd.d a0, a2, (a1)
 /// ```
@@ -986,9 +986,9 @@ pub const fn encode_amoadd_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoswap_d;
+/// use brik::rv64::encode_amoswap_d;
 /// let inst = encode_amoswap_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x08C5B52F); // amoswap.d a0, a2, (a1)
 /// ```
@@ -1009,9 +1009,9 @@ pub const fn encode_amoswap_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoand_d;
+/// use brik::rv64::encode_amoand_d;
 /// let inst = encode_amoand_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x60C5B52F); // amoand.d a0, a2, (a1)
 /// ```
@@ -1032,9 +1032,9 @@ pub const fn encode_amoand_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoor_d;
+/// use brik::rv64::encode_amoor_d;
 /// let inst = encode_amoor_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x40C5B52F); // amoor.d a0, a2, (a1)
 /// ```
@@ -1055,9 +1055,9 @@ pub const fn encode_amoor_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amoxor_d;
+/// use brik::rv64::encode_amoxor_d;
 /// let inst = encode_amoxor_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x20C5B52F); // amoxor.d a0, a2, (a1)
 /// ```
@@ -1078,9 +1078,9 @@ pub const fn encode_amoxor_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amomax_d;
+/// use brik::rv64::encode_amomax_d;
 /// let inst = encode_amomax_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0xA0C5B52F); // amomax.d a0, a2, (a1)
 /// ```
@@ -1101,9 +1101,9 @@ pub const fn encode_amomax_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amomin_d;
+/// use brik::rv64::encode_amomin_d;
 /// let inst = encode_amomin_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0x80C5B52F); // amomin.d a0, a2, (a1)
 /// ```
@@ -1124,9 +1124,9 @@ pub const fn encode_amomin_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amomaxu_d;
+/// use brik::rv64::encode_amomaxu_d;
 /// let inst = encode_amomaxu_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0xE0C5B52F); // amomaxu.d a0, a2, (a1)
 /// ```
@@ -1147,9 +1147,9 @@ pub const fn encode_amomaxu_d(rd: Reg, rs1: Reg, rs2: Reg, aqrl: AqRl) -> u32 {
 ///
 /// # Example
 /// ```
-/// use brik::asm_riscv::Reg;
+/// use brik::rv32::Reg;
 /// use brik::util::opcode::AqRl;
-/// use brik::util::rv64::encode_amominu_d;
+/// use brik::rv64::encode_amominu_d;
 /// let inst = encode_amominu_d(Reg::A0, Reg::A1, Reg::A2, AqRl::None);
 /// assert_eq!(inst, 0xC0C5B52F); // amominu.d a0, a2, (a1)
 /// ```
