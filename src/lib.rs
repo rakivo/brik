@@ -1,10 +1,4 @@
 // TODO(#1): Implement tests
-// TODO(#12): Implement API for emission of `.globl`/`.global`/ and `.weak`
-//   e.g. a function declared `.globl foo` or `.global foo` should create a SymbolId
-//   with SymbolScope::Dynamic (visible outside the object) and appropriate kind (text or data).
-//   A symbol declared `.weak foo` should set the weak binding (STB_WEAK) in ELF/Mach-O.
-//   In the object crate this may require setting SymbolFlags::Elf { st_info, st_other } or using a dedicated flag;
-//   provide a user API such as set_symbol_weak(symbol_id) or allow a weak parameter when adding the symbol.
 // TODO(#10): Implement API for emission of COMDAT sections
 //   Support COMDAT grouping so that identically‑named sections (or data items) can be folded at link time.
 //   .e.g. template or inline function instantiations often require sections marked "any" or "same_size" COMDAT.
