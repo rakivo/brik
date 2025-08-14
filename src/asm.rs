@@ -93,16 +93,12 @@ impl<'a> Deref for Assembler<'a> {
     type Target = Object<'a>;
 
     #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.obj
-    }
+    fn deref(&self) -> &Self::Target { &self.obj }
 }
 
 impl<'a> DerefMut for Assembler<'a> {
     #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.obj
-    }
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.obj }
 }
 
 impl<'a> Assembler<'a> {
@@ -611,7 +607,7 @@ impl<'a> Assembler<'a> {
                     let mut inst = u32::from_le_bytes(
                         data.try_into().expect("invalid instruction length")
                     );
-                    inst &= !(0xfffff000); // clear AUIPC imm[31:12]
+                    inst &= !0xfffff000; // clear AUIPC imm[31:12]
                     inst |= (imm20 as u32) << 12;
 
                     // NOTE: JALR is in the next 4 bytes; need to handle both
@@ -639,7 +635,7 @@ impl<'a> Assembler<'a> {
                         data.try_into().expect("invalid instruction length")
                     );
 
-                    inst &= !(0xfffff000); // clear imm[31:12].
+                    inst &= !0xfffff000; // clear imm[31:12].
                     inst |= (imm20 as u32) << 12;
 
                     inst.copy_into(data);
