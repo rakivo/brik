@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use num_traits::{PrimInt, Signed, Unsigned, FromPrimitive, ToPrimitive};
 
 /// Max number of bytes needed to encode a u128 or i128 in LEB128 format.
-pub const MAX_LEB128_BYTES: usize = 128_u8.div_ceil(17) as _;
+pub const MAX_LEB128_BYTES: usize = 128_u8.div_ceil(7) as _;
 
 /// Return type of encoding LEB128
 pub type LebBytes = SmallVec<[u8; MAX_LEB128_BYTES]>;
