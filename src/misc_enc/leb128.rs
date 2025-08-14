@@ -66,7 +66,7 @@ where
         shift += 7;
     }
 
-    Err(anyhow::anyhow!("incomplete SLEB128 sequence"))
+    Err(anyhow::anyhow!("incomplete ULEB128 sequence"))
 }
 
 /// Encode signed integer as SLEB128.
