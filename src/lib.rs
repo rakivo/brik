@@ -1,5 +1,4 @@
 // TODO(#1): Implement tests
-// TODO(#11): Implement API for emission of `.uleb128`, `.sleb128`
 // TODO(#12): Implement API for emission of `.globl`/`.global`/ and `.weak`
 //   e.g. a function declared `.globl foo` or `.global foo` should create a SymbolId
 //   with SymbolScope::Dynamic (visible outside the object) and appropriate kind (text or data).
