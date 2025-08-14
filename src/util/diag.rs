@@ -207,14 +207,14 @@ pub fn text_into_named_source_and_span(
         let line = misc::b0(line, line);
 
         let byte_offset = if text.len() < CONTENT_SIZE_THRESHOLD {
-            calculate_byte_offset_small(&text, line, column)
+            calculate_byte_offset_small(text, line, column)
         } else {
-            calculate_byte_offset_large(&text, line, column)
+            calculate_byte_offset_large(text, line, column)
         };
 
         (
             BrikNamedSource::new(file_path, text_.clone()),
-            BrikSourceSpan::new(byte_offset.into(), highlight_len.into()),
+            BrikSourceSpan::new(byte_offset, highlight_len),
         )
     } else {
         (
