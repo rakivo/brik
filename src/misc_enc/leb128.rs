@@ -90,7 +90,7 @@ where
     let mask = T::from_u8(0x7F).expect("couldn't construct u8 from T");
     let i8_neg1 = unsafe { T::from_i8(-1).unwrap_unchecked() };
 
-    let mut buf = LebBytes::new();
+    let mut buf = LebBytes::with_capacity(MAX_LEB128_BYTES);
     loop {
         let byte_val = (value & mask).to_u8().unwrap();
         let sign_bit_set = (byte_val & 0x40) != 0;
@@ -98,7 +98,6 @@ where
 
         let done = (value == T::zero() && !sign_bit_set) ||
                    (value == i8_neg1 && sign_bit_set);
-
 
         let byte_val = if done {
             byte_val
