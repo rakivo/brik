@@ -20,7 +20,6 @@
 //   and correctly pair them
 // TODO(#14): Support for Section attributes
 // TODO(#15): Support MACH-O/COFF relocation kinds
-// TODO(#16): Implement API for emission of `.comm`
 // TODO(#17): Implement API for emission of `pic/nopic`, `relax/norelax`
 // TODO(#9): `Imm` enum for convenient im usage
 // TODO(#2): Implement F/D-extension: (single/double precision)
