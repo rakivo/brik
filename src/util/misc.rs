@@ -87,18 +87,19 @@ macro_rules! with_at_end {
 }
 
 // TODO(#19): Make `with_at!` support for generics and `where` clauses
-macro_rules! with_at {
+macro_rules! with_no_at {
+    // section version
     (
         $no_at_name: ident,
         $(#[$meta:meta])*
         pub fn $name_at:ident (
             &mut $self:ident,
-            $section:ident: SectionId $(, $arg:ident: $ty:ty $(,)?)*
+            $section:ident: $section_type:ty $(, $arg:ident: $ty:ty $(,)?)*
         ) $(-> $ret:ty)? $body:block
     ) => {
         $(#[$meta])*
         pub fn $name_at(
-            &mut $self, $section: SectionId $(, $arg: $ty)*
+            &mut $self, $section: $section_type $(, $arg: $ty)*
         ) $(-> $ret)? $body
 
         #[track_caller]
@@ -108,4 +109,29 @@ macro_rules! with_at {
             $self.$name_at($section $(, $arg)*)
         }
     };
+
+    // symbol version
+    (
+        symbol
+        $no_at_name: ident,
+        $(#[$meta:meta])*
+        pub fn $name_at:ident (
+            &mut $self:ident,
+            $section:ident: $section_type:ty $(, $arg:ident: $ty:ty $(,)?)*
+        ) $(-> $ret:ty)? $body:block
+    ) => {
+        $(#[$meta])*
+        pub fn $name_at(
+            &mut $self, $section: $section_type $(, $arg: $ty)*
+        ) $(-> $ret)? $body
+
+        #[track_caller]
+        #[inline(always)]
+        pub fn $no_at_name(&mut $self $(, $arg: $ty)*) $(-> $ret)? {
+            let $section = $self.expect_curr_section();
+            let $section = $crate::object::write::SymbolSection::Section($section);
+            $self.$name_at($section $(, $arg)*)
+        }
+    };
+
 }
