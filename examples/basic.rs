@@ -3,6 +3,7 @@ use brik::asm::Assembler;
 use brik::object::{
     Endianness,
     SymbolKind,
+    SymbolFlags,
     SymbolScope,
     Architecture,
     BinaryFormat,
@@ -31,15 +32,7 @@ fn produce_add_34_35_obj<'a>() -> Object<'a> {
     // .rodata section for format string
     let _rodata = asm.add_rodata_section_at_end();
 
-    let fmt_bytes = b"34 + 35 = %d\n\0";
-    let fmt_offset = asm.emit_bytes(fmt_bytes);
-    let fmt_sym = asm.add_symbol(
-        b"fmt",
-        fmt_offset,
-        fmt_bytes.len() as u64,
-        SymbolKind::Data,
-        SymbolScope::Compilation,
-    );
+    let fmt_sym = asm.define_data("fmt", b"34 + 35 = %d\n\0");
 
     let printf_sym = asm.add_symbol_extern(
         b"printf",
@@ -71,6 +64,8 @@ fn produce_add_34_35_obj<'a>() -> Object<'a> {
         asm.section_size(text_section) as _,
         SymbolKind::Text,
         SymbolScope::Dynamic,
+        false,
+        SymbolFlags::None
     );
 
     asm.finish().unwrap()

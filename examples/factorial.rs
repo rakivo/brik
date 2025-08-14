@@ -1,16 +1,17 @@
 use brik::rv64;
-use brik::asm::Assembler;
 use brik::rv32::{I, Reg};
+use brik::asm::Assembler;
 use brik::object::{
     Endianness,
     SymbolKind,
     SymbolScope,
+    SymbolFlags,
     Architecture,
     BinaryFormat,
 };
 use brik::object::write::{
     Object,
-    FileFlags
+    FileFlags,
 };
 
 use std::{fs, env, error};
@@ -32,37 +33,14 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     // .rodata section for format strings
     let _rodata = asm.add_rodata_section_at_end();
 
-    let input_fmt_bytes = b"enter a number: \0";
-    let input_fmt_offset = asm.emit_bytes(input_fmt_bytes);
-    let input_fmt_sym = asm.add_symbol(
-        b"input_fmt",
-        input_fmt_offset,
-        input_fmt_bytes.len() as u64,
-        SymbolKind::Data,
-        SymbolScope::Compilation,
-    );
+    let input_fmt_sym = asm.define_data(b"input_fmt", b"enter a number: \0");
 
-    let scanf_fmt_bytes = b"%ld\0";
-    let scanf_fmt_offset = asm.emit_bytes(scanf_fmt_bytes);
-    let scanf_fmt_sym = asm.add_symbol(
-        b"scanf_fmt",
-        scanf_fmt_offset,
-        scanf_fmt_bytes.len() as u64,
-        SymbolKind::Data,
-        SymbolScope::Compilation,
-    );
+    let scanf_fmt_sym = asm.define_data(b"scanf_fmt", b"%ld\0");
 
-    let result_fmt_bytes = b"factorial: %ld\n\0";
-    let result_fmt_offset = asm.emit_bytes(result_fmt_bytes);
-    let result_fmt_sym = asm.add_symbol(
-        b"result_fmt",
-        result_fmt_offset,
-        result_fmt_bytes.len() as u64,
-        SymbolKind::Data,
-        SymbolScope::Compilation,
-    );
+    let result_fmt_sym = asm.define_data(b"result_fmt", b"factorial: %ld\n\0");
 
     // external symbols
+
     let printf_sym = asm.add_symbol_extern(
         b"printf",
         SymbolKind::Text,
@@ -141,6 +119,8 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
         asm.section_size(text_section),
         SymbolKind::Text,
         SymbolScope::Dynamic,
+        false,
+        SymbolFlags::None
     );
 
     asm.finish().unwrap()

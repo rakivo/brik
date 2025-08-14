@@ -3,6 +3,7 @@ use brik::rv32::{I, Reg};
 use brik::object::{
     Endianness,
     SymbolKind,
+    SymbolFlags,
     SymbolScope,
     Architecture,
     BinaryFormat,
@@ -12,7 +13,7 @@ use brik::object::write::{
     FileFlags
 };
 
-use std::{fs, env, mem, error};
+use std::{fs, env, error};
 
 fn produce_countdown_obj<'a>() -> Object<'a> {
     let mut asm = Assembler::new(
@@ -31,25 +32,8 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     // .rodata section strings
     let _rodata = asm.add_rodata_section_at_end();
 
-    let msg_bytes = b"Hello from RISC-V\n\0";
-    let msg_offset = asm.emit_bytes(msg_bytes);
-    let msg_sym = asm.add_symbol(
-        b"msg",
-        msg_offset,
-        msg_bytes.len() as u64,
-        SymbolKind::Data,
-        SymbolScope::Compilation,
-    );
-
-    let countdown_constant = 10u64;
-    let countdown_offset = asm.emit_bytes(countdown_constant);
-    let countdown_sym = asm.add_symbol(
-        b"countdown",
-        countdown_offset,
-        mem::size_of_val(&countdown_constant) as _,
-        SymbolKind::Data,
-        SymbolScope::Compilation,
-    );
+    let msg_sym = asm.define_data("msg", b"Hello from RISC-V\n\0");
+    let countdown_sym = asm.define_data("countdown", 10u64);
 
     let printf_sym = asm.add_symbol_extern(
         b"printf",
@@ -94,6 +78,8 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
         asm.section_size(text_section),
         SymbolKind::Text,
         SymbolScope::Dynamic,
+        false,
+        SymbolFlags::None
     );
 
     asm.finish().unwrap()
