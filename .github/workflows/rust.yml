@@ -22,13 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Install Rust
+      # 1a. Install Rust
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           profile: minimal
           override: true
+
+      # 1b. Add Clippy for this toolchain
+      - name: Add Clippy
+        run: rustup component add clippy --toolchain ${{ matrix.rust }}
 
       # 2. Cache cargo registry & build artifacts
       - name: Cache cargo registry
