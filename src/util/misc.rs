@@ -115,10 +115,14 @@ macro_rules! with_no_at {
         $(<$($generics),*>)?
         (
             &mut $self, $section: $section_type $(, $arg: $ty)*
-        ) $(-> $ret)? $body
+        )
+        $(-> $ret)?
+        $body
 
+        $(#[$meta])*
         #[track_caller]
         #[inline(always)]
+        #[allow(unused_attributes)]
         pub fn $no_at_name
         $(<$($generics),*>)?
         (&mut $self $(, $arg: $ty)*)
@@ -141,6 +145,7 @@ macro_rules! with_no_at {
             $section:ident: $section_type:ty $(, $arg:ident: $ty:ty $(,)?)*
         ) $(-> $ret:ty)? $body:block
     ) => {
+
         $(#[$meta])*
         pub fn $name_at
         $(<$($generics),*>)?
@@ -148,8 +153,10 @@ macro_rules! with_no_at {
             &mut $self, $section: $section_type $(, $arg: $ty)*
         ) $(-> $ret)? $body
 
+        $(#[$meta])*
         #[track_caller]
         #[inline(always)]
+        #[allow(unused_attributes)]
         pub fn $no_at_name
         $(<$($generics),*>)?
         (&mut $self $(, $arg: $ty)*)

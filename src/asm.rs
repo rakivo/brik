@@ -406,6 +406,7 @@ impl<'a> Assembler<'a> {
     with_no_at! {
         emit_r,
         #[inline(always)]
+        #[allow(clippy::too_many_arguments)]
         pub fn emit_r_at(
             &mut self,
             section: SectionId,
@@ -439,6 +440,7 @@ impl<'a> Assembler<'a> {
     with_no_at! {
         emit_i7,
         #[inline(always)]
+        #[allow(clippy::too_many_arguments)]
         pub fn emit_i7_at(
             &mut self,
             section: SectionId,
@@ -1071,6 +1073,7 @@ impl<'a> Assembler<'a> {
         symbol
         add_symbol,
         #[inline]
+        #[allow(clippy::too_many_arguments)]
         pub fn add_symbol_at(
             &mut self,
             section: SymbolSection,
