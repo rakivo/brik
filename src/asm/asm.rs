@@ -1,17 +1,17 @@
 //! Object file builder
 
 use crate::rv32;
-#[cfg(feature = "std")]
-use crate::util::diag;
+use crate::util::misc;
 use crate::rv32::{I, Reg};
 use crate::{rv64, misc_enc};
 use crate::util::into_bytes::IntoBytes;
-use crate::reloc::{Reloc, PcrelPart, RelocKind};
+use crate::asm::label::{Label, LabelId};
+use crate::asm::arch::{Arch, AddressSize};
+use crate::asm::reloc::{Reloc, PcrelPart, RelocKind};
 use crate::util::attr_builder::RiscvAttrsBuilder;
-#[cfg(feature = "std")]
-use crate::util::diag::{
-    DiagnosticRenderer,
-    UnplacedLabelDiagnostic
+use crate::asm::errors::{
+    FinishError,
+    UnplacedLabelInfo
 };
 use crate::object::{
     Endianness,
@@ -19,7 +19,6 @@ use crate::object::{
     SymbolFlags,
     SymbolScope,
     SectionKind,
-    Architecture,
     BinaryFormat,
 };
 use crate::object::write::{
@@ -45,7 +44,7 @@ use std::vec::Vec;
 use std::string::String;
 use std::borrow::ToOwned;
 
-use core::{fmt, mem, panic};
+use core::{mem, panic};
 use core::ops::{Deref, DerefMut};
 
 use rustc_hash::FxHashMap;
@@ -65,10 +64,12 @@ fn default_emit_function_prologue(
     asm: &mut Assembler,
     section: SectionId
 ) -> u64 {
-    asm.emit_addi_at(section, Reg::SP, Reg::SP, -16);
-    asm.emit_sd_at(section,   Reg::RA, Reg::SP,   8);
-    asm.emit_sd_at(section,   Reg::S0, Reg::SP,   0);
-    asm.emit_addi_at(section, Reg::S0, Reg::SP,  16)
+    let ptr_size = asm.address_bytes() as i16;
+
+    asm.emit_addi_at(section, Reg::SP, Reg::SP, -ptr_size * 2);
+    asm.emit_sd_at(section,   Reg::RA, Reg::SP, ptr_size);
+    asm.emit_sd_at(section,   Reg::S0, Reg::SP, 0);
+    asm.emit_addi_at(section, Reg::S0, Reg::SP, ptr_size * 2)
 }
 
 #[inline(always)]
@@ -76,45 +77,22 @@ fn default_emit_function_epilogue(
     asm: &mut Assembler,
     section: SectionId
 ) -> u64 {
-    asm.emit_ld_at(section,   Reg::RA, Reg::SP,  8);
-    asm.emit_ld_at(section,   Reg::S0, Reg::SP,  0);
-    asm.emit_addi_at(section, Reg::SP, Reg::SP, 16)
-}
+    let ptr_size = asm.address_bytes() as i16;
 
-#[derive(Eq, Ord, Hash, Copy, Clone, Debug, PartialEq, PartialOrd)]
-pub struct LabelId(usize);
-
-#[derive(Copy, Clone, Debug)]
-pub struct Label {
-    sym: SymbolId,
-}
-
-#[derive(Debug)]
-pub struct UnplacedLabelInfo {
-    caller_loc: &'static panic::Location<'static>
-}
-
-/// The FinishError stores the pre-rendered, pretty error text.
-pub struct FinishError {
-    /// Rendered miette diagnostic(s)
-    pub rendered: String,
-}
-
-debug_from_display!(FinishError, newline);
-
-impl fmt::Display for FinishError {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { rendered } = self;
-        write!(f, "{rendered}")
-    }
+    asm.emit_ld_at(section,   Reg::RA, Reg::SP, ptr_size);
+    asm.emit_ld_at(section,   Reg::S0, Reg::SP, 0);
+    asm.emit_addi_at(section, Reg::SP, Reg::SP, ptr_size * 2)
 }
 
 /// Object file builder
 #[derive(Debug)]
 pub struct Assembler<'a> {
     obj: Object<'a>,
+
+    arch: Arch,
+
     relocs: Vec<(SectionId, Reloc)>,
+
     curr_section: Option<SectionId>,
 
     pcrel_counter: u32,
@@ -122,8 +100,8 @@ pub struct Assembler<'a> {
 
     format: BinaryFormat,
 
-    labels          : FxHashMap<LabelId, Label>,
-    unplaced_labels : FxHashMap<LabelId, UnplacedLabelInfo>,
+    labels: FxHashMap<LabelId, Label>,
+    pub(crate) unplaced_labels: FxHashMap<LabelId, UnplacedLabelInfo>,
 
     pub custom_emit_function_prologue: EmitFunctionPrologue,
     pub custom_emit_function_epilogue: EmitFunctionEpilogue,
@@ -149,28 +127,42 @@ impl<'a> Assembler<'a> {
     /// # Examples
     ///
     /// ```no_run
-    /// use brik::{asm, object};
-    /// let mut asm = asm::Assembler::new(
-    ///     object::BinaryFormat::Elf,
-    ///     object::Architecture::Riscv64,
-    ///     object::Endianness::Little,
+    /// use brik::asm::Assembler;
+    /// use brik::asm::arch::Arch;
+    /// use brik::object::{BinaryFormat, Endianness};
+    ///
+    /// let mut asm = Assembler::new(
+    ///     BinaryFormat::Elf,
+    ///     Arch::Riscv64,
+    ///     Endianness::Little,
     ///     "rv64gc",
     /// );
     /// ```
     pub fn new(
         format: BinaryFormat,
-        arch: Architecture,
+        arch: Arch,
         endian: Endianness,
         isa: &str
     ) -> Self {
         let mut asm = Self {
             format,
+
+            arch,
+
+            curr_section: None,
+
             pcrel_counter: 0,
             lbl_id_counter: LabelId(0),
-            curr_section: None,
+
             labels: FxHashMap::default(),
             unplaced_labels: FxHashMap::default(),
-            obj: Object::new(format, arch, endian),
+
+            obj: Object::new(
+                format,
+                arch.into_object_architecture(),
+                endian
+            ),
+
             relocs: Vec::with_capacity(
                 Self::RELOC_PREALLOCATION_COUNT
             ),
@@ -205,67 +197,7 @@ impl<'a> Assembler<'a> {
             return Ok(self.obj)
         }
 
-        Err(self.into_finish_error())
-    }
-
-    fn into_finish_error(mut self) -> FinishError {
-        #[cfg(feature = "std")]
-        use std::{fs, sync::Arc};
-
-        #[cfg(feature = "std")]
-        #[allow(clippy::default_constructed_unit_structs)]
-        let renderer = DiagnosticRenderer::default();
-
-        #[cfg(feature = "std")]
-        let mut file_cache = FxHashMap::<_, Arc<str>>::default();
-
-        let unplaced_labels = mem::take(&mut self.unplaced_labels);
-
-        let reports = unplaced_labels.into_iter().map(|(lbl_id, info)| {
-            let label = self.get_label(lbl_id);
-            let name_bytes = self.get_symbol_name(label.sym);
-            let label_name = str::from_utf8(name_bytes)
-                .unwrap_or("<invalid UTF-8>")
-                .to_owned();
-
-            let file_path = info.caller_loc.file();
-
-            #[cfg(feature = "no_std")] {
-                format!{
-                    "error: unplaced label '{label_name}'\n --> {f}:{l}:{c}",
-                    f = file_path,
-                    l = info.caller_loc.line(),
-                    c = info.caller_loc.column()
-                }
-            }
-
-            #[cfg(feature = "std")] {
-                let content = file_cache.entry(file_path).or_insert_with(|| {
-                    fs::read_to_string(file_path).unwrap_or_default().into()
-                });
-
-                let (named_src, span) = diag::text_into_named_source_and_span(
-                    Arc::clone(content),
-                    file_path,
-                    info.caller_loc.line() as _,
-                    info.caller_loc.column() as _,
-                    label_name.len().max(1)
-                );
-
-                let diag = UnplacedLabelDiagnostic {
-                    span,
-                    src: named_src,
-                    name: label_name
-                };
-
-                renderer.render_to_string(&diag)
-            }
-        }).collect::<Vec<_>>();
-
-        FinishError {
-            // join multiple diagnostics with a blank line between them
-            rendered: reports.join("\n\n")
-        }
+        Err(FinishError::from_asm(self))
     }
 
     #[inline(always)]
@@ -276,6 +208,26 @@ impl<'a> Assembler<'a> {
     #[inline(always)]
     pub const fn set_object_flags(&mut self, flags: FileFlags) {
         self.obj.flags = flags
+    }
+
+    #[inline(always)]
+    pub const fn arch(&self) -> Arch {
+        self.arch
+    }
+
+    #[inline(always)]
+    pub const fn address_size(&self) -> AddressSize {
+        self.arch.address_size()
+    }
+
+    #[inline(always)]
+    pub const fn address_bytes(&self) -> u8 {
+        self.arch.address_size().bytes()
+    }
+
+    #[inline(always)]
+    pub const fn address_bits(&self) -> u8 {
+        self.arch.address_size().bits()
     }
 
     #[must_use]
@@ -846,7 +798,14 @@ impl<'a> Assembler<'a> {
         }
     }
 
+    // TODO: Make `resolve_local_relocs` work for 32-bit architectures
     pub fn resolve_local_relocs(&mut self) {
+        debug_assert_eq!{
+            self.arch,
+            Arch::Riscv64,
+            "only 64-bit architectures are supported for now"
+        };
+
         fn apply_reloc(data: &mut [u8], rtype: RelocKind, delta: i64) {
             match rtype {
                 RelocKind::Branch => {
@@ -855,9 +814,7 @@ impl<'a> Assembler<'a> {
                     }
 
                     let imm13 = delta as i32;
-                    let mut inst = u32::from_le_bytes(
-                        data.try_into().expect("invalid instruction length")
-                    );
+                    let mut inst = misc::le_bytes_into_int::<u32>(data);
 
                     // clear imm fields: bit31, 30:25, 11:8, bit7
                     inst &= !((1u32 << 31) | (0x3fu32 << 25) | (0xfu32 << 8) | (1u32 << 7));
@@ -876,9 +833,7 @@ impl<'a> Assembler<'a> {
                     }
 
                     let imm21 = delta as i32;
-                    let mut inst = u32::from_le_bytes(
-                        data.try_into().expect("invalid instruction length")
-                    );
+                    let mut inst = misc::le_bytes_into_int::<u32>(data);
 
                     // clear the imm field (bits 31:12)
                     inst &= 0x00000fff;
@@ -899,18 +854,14 @@ impl<'a> Assembler<'a> {
                     let imm20 = ((delta + 0x800) >> 12) as i32; // AUIPC imm
                     let imm12 = delta as i32 & 0xfff;           // JALR  imm
 
-                    let mut inst = u32::from_le_bytes(
-                        data.try_into().expect("invalid instruction length")
-                    );
+                    let mut inst = misc::le_bytes_into_int::<u32>(&data[0..4]);
                     inst &= !0xfffff000; // clear AUIPC imm[31:12]
                     inst |= (imm20 as u32) << 12;
 
                     // NOTE: JALR is in the next 4 bytes; need to handle both
                     // this assumes data slice includes AUIPC + JALR (8 bytes)
                     let jalr_slice = &mut data[4..8];
-                    let mut jalr_inst = u32::from_le_bytes(
-                        jalr_slice.try_into().expect("invalid instruction length")
-                    );
+                    let mut jalr_inst = misc::le_bytes_into_int::<u32>(jalr_slice);
 
                     jalr_inst &= !(0xfff << 20); // clear JALR imm[11:0]
                     jalr_inst |= (imm12 as u32) << 20;
@@ -926,9 +877,7 @@ impl<'a> Assembler<'a> {
 
                     // add 0x800 for rounding
                     let imm20 = ((delta + 0x800) >> 12) as i32;
-                    let mut inst = u32::from_le_bytes(
-                        data.try_into().expect("invalid instruction length")
-                    );
+                    let mut inst = misc::le_bytes_into_int::<u32>(data);
 
                     inst &= !0xfffff000; // clear imm[31:12].
                     inst |= (imm20 as u32) << 12;
@@ -942,9 +891,7 @@ impl<'a> Assembler<'a> {
                     }
 
                     let imm12 = delta as i32;
-                    let mut inst = u32::from_le_bytes(
-                        data.try_into().expect("invalid instruction length")
-                    );
+                    let mut inst = misc::le_bytes_into_int::<u32>(data);
 
                     inst &= !(0xfff << 20); // clear imm[11:0].
                     inst |= (imm12 as u32) << 20;
@@ -1429,6 +1376,34 @@ impl<'a> Assembler<'a> {
     }
 
     with_no_at! {
+        emit_return_im32,
+        #[inline(always)]
+        pub fn emit_ret_im32_at(
+            &mut self,
+            section: SectionId,
+            im: i32
+        ) -> u64 {
+            let bytes = rv32::encode_li_rv32_little(Reg::A0, im);
+            self.emit_bytes_at(section, bytes);
+            self.emit_ret()
+        }
+    }
+
+    with_no_at! {
+        emit_return_im64,
+        #[inline(always)]
+        pub fn emit_ret_im64_at(
+            &mut self,
+            section: SectionId,
+            im: i64
+        ) -> u64 {
+            let bytes = rv64::encode_li_rv64_little(Reg::A0, im);
+            self.emit_bytes_at(section, bytes);
+            self.emit_ret()
+        }
+    }
+
+    with_no_at! {
         emit_return_imm,
         #[inline(always)]
         pub fn emit_return_imm_at(
@@ -1436,9 +1411,10 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             imm: i64
         ) -> u64 {
-            let bytes = rv64::encode_li_rv64_little(Reg::A0, imm);
-            self.emit_bytes_at(section, bytes);
-            self.emit_ret()
+            match self.arch {
+                Arch::Riscv32 => self.emit_ret_im32_at(section, imm as i32),
+                Arch::Riscv64 => self.emit_ret_im64_at(section, imm),
+            }
         }
     }
 
@@ -1612,6 +1588,36 @@ impl<'a> Assembler<'a> {
     }
 
     with_no_at! {
+        emit_li32,
+        /// Load 32-bit immediate value into register (pseudo-instruction)
+        #[inline(always)]
+        pub fn emit_li32_at(
+            &mut self,
+            section: SectionId,
+            rd: Reg,
+            im: i32
+        ) -> u64 {
+            let bytes = rv32::encode_li_rv32_little(rd, im);
+            self.emit_bytes_at(section, bytes)
+        }
+    }
+
+    with_no_at! {
+        emit_li64,
+        /// Load 64-bit immediate value into register (pseudo-instruction)
+        #[inline(always)]
+        pub fn emit_li64_at(
+            &mut self,
+            section: SectionId,
+            rd: Reg,
+            im: i64
+        ) -> u64 {
+            let bytes = rv64::encode_li_rv64_little(rd, im);
+            self.emit_bytes_at(section, bytes)
+        }
+    }
+
+    with_no_at! {
         emit_li,
         /// Load immediate value into register (pseudo-instruction)
         #[inline(always)]
@@ -1621,8 +1627,10 @@ impl<'a> Assembler<'a> {
             rd: Reg,
             imm: i64
         ) -> u64 {
-            let bytes = rv64::encode_li_rv64_little(rd, imm);
-            self.emit_bytes_at(section, bytes)
+            match self.arch {
+                Arch::Riscv32 => self.emit_li32_at(section, rd, imm as i32),
+                Arch::Riscv64 => self.emit_li64_at(section, rd, imm),
+            }
         }
     }
 
@@ -2021,7 +2029,8 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             reg: Reg
         ) -> u64 {
-            self.emit_addi_at(section, Reg::SP, Reg::SP, -8);
+            let ptr_size = self.address_bytes() as i16;
+            self.emit_addi_at(section, Reg::SP, Reg::SP, -ptr_size);
             self.emit_sd_at(section, Reg::SP, reg, 0)
         }
     }
@@ -2035,8 +2044,9 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             reg: Reg
         ) -> u64 {
+            let ptr_size = self.address_bytes() as i16;
             self.emit_ld_at(section, reg, Reg::SP, 0);
-            self.emit_addi_at(section, Reg::SP, Reg::SP, 8)
+            self.emit_addi_at(section, Reg::SP, Reg::SP, ptr_size)
         }
     }
 }

@@ -1,11 +1,11 @@
 use brik::rv32::Reg;
 use brik::asm::Assembler;
+use brik::asm::arch::Arch;
 use brik::object::{
     Endianness,
     SymbolKind,
     SymbolFlags,
     SymbolScope,
-    Architecture,
     BinaryFormat,
 };
 use brik::object::write::{
@@ -39,7 +39,7 @@ fn debug_epilogue(asm: &mut Assembler, section: SectionId) -> u64 {
 fn produce_custom_obj<'a>() -> Object<'a> {
     let mut asm = Assembler::new(
         BinaryFormat::Elf,
-        Architecture::Riscv64,
+        Arch::Riscv64,
         Endianness::Little,
         "rv64gc"
     );

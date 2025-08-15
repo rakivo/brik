@@ -5,7 +5,7 @@ edition = "2024"
 authors = ["Mark Tyrkba <marktyrkba456@gmail.com>"]
 
 [dependencies]
-brik_rv32  = { version = "0.2.0",   default-features = false, git = "https://github.com/rakivo/brik_rv32.git", rev = "2d45906" }
+brik_rv32  = { version = "0.2.0",   default-features = false, git = "https://github.com/rakivo/brik_rv32.git", rev = "7add182" }
 smallvec   = { version = "1.15.1",  default-features = false }
 thiserror  = { version = "2.0",     default-features = false }
 bytecount  = { version = "0.6.9",   default-features = false }

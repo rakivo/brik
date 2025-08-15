@@ -1,11 +1,11 @@
 use brik::asm::Assembler;
 use brik::rv32::{I, Reg};
+use brik::asm::arch::Arch;
 use brik::object::{
     Endianness,
     SymbolKind,
     SymbolFlags,
     SymbolScope,
-    Architecture,
     BinaryFormat,
 };
 use brik::object::write::{
@@ -18,7 +18,7 @@ use std::{fs, env, error};
 fn produce_countdown_obj<'a>() -> Object<'a> {
     let mut asm = Assembler::new(
         BinaryFormat::Elf,
-        Architecture::Riscv64,
+        Arch::Riscv64,
         Endianness::Little,
         "rv64gc"
     );

@@ -1,5 +1,9 @@
 //! Helper functions and macros
 
+use core::fmt;
+
+use num_traits::{PrimInt, FromBytes};
+
 /// Convert `v` from 1-based to 0-based, clamping the result with `cap`
 ///
 /// # Examples
@@ -19,6 +23,32 @@
 pub const fn b0(v: usize, cap: usize) -> usize {
     let v = v.saturating_sub(1);
     if v < cap { v } else { cap }
+}
+
+#[track_caller]
+#[inline(always)]
+#[doc(alias = "lint")]
+pub fn le_bytes_into_int<T>(bytes: &[u8]) -> T
+where
+    T: PrimInt + FromBytes,
+    <T as FromBytes>::Bytes: Sized + for<'a> TryFrom<&'a [u8]>,
+    for<'a> <<T as FromBytes>::Bytes as TryFrom<&'a [u8]>>::Error: fmt::Debug,
+{
+    let array: <T as FromBytes>::Bytes = bytes.try_into().expect("wrong length");
+    T::from_le_bytes(&array)
+}
+
+#[track_caller]
+#[inline(always)]
+#[doc(alias = "bint")]
+pub fn be_bytes_into_int<T>(bytes: &[u8]) -> T
+where
+    T: PrimInt + FromBytes,
+    <T as FromBytes>::Bytes: Sized + for<'a> TryFrom<&'a [u8]>,
+    for<'a> <<T as FromBytes>::Bytes as TryFrom<&'a [u8]>>::Error: fmt::Debug,
+{
+    let array: <T as FromBytes>::Bytes = bytes.try_into().expect("wrong length");
+    T::from_be_bytes(&array)
 }
 
 // Check if T fits into 12-bits integer (i12)
