@@ -35,6 +35,13 @@ impl<'a, const N: usize> IntoBytes<'a> for &'a [u8; N] {
     }
 }
 
+impl<'a> IntoBytes<'a> for &'a str {
+    #[inline(always)]
+    fn into_bytes(self) -> Cow<'a, [u8]> {
+        Cow::Borrowed(self.as_bytes())
+    }
+}
+
 impl<'a> IntoBytes<'a> for Vec<u8> {
     #[inline(always)]
     fn into_bytes(self) -> Cow<'a, [u8]> {
