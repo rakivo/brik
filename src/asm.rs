@@ -39,6 +39,7 @@ use crate::object::write::{
 };
 
 use std::str;
+use std::vec;
 use std::format;
 use std::vec::Vec;
 use std::string::String;

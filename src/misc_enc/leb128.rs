@@ -2,7 +2,7 @@
 //!
 //! Variable-length encoding, 7 bits per byte, little-endian base-128.
 
-use std::mem;
+use core::mem;
 
 use smallvec::SmallVec;
 use num_traits::{PrimInt, Signed, Unsigned, FromPrimitive, ToPrimitive};
