@@ -42,3 +42,7 @@ path = "examples/countdown.rs"
 [[example]]
 name = "factorial"
 path = "examples/factorial.rs"
+
+[[example]]
+name = "custom_logue"
+path = "examples/custom_logue.rs"
