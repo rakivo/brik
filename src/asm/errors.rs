@@ -6,9 +6,12 @@ use crate::util::diag::{
     UnplacedLabelDiagnostic
 };
 
-use core::{fmt, mem, panic};
+use std::format;
+use std::vec::Vec;
+use std::string::String;
+use std::borrow::ToOwned;
 
-use rustc_hash::FxHashMap;
+use core::{fmt, mem, panic};
 
 #[derive(Debug)]
 pub(crate) struct UnplacedLabelInfo {
