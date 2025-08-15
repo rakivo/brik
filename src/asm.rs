@@ -1153,6 +1153,31 @@ impl<'a> Assembler<'a> {
     }
 
     with_no_at!{
+        symbol
+        add_symbol_global,
+        #[inline]
+        pub fn add_symbol_global_at(
+            &mut self,
+            section: SymbolSection,
+            name: impl AsRef<[u8]>,
+            value: u64,
+            size: u64,
+            kind: SymbolKind,
+        ) -> SymbolId {
+            self.add_symbol_at(
+                section,
+                name,
+                value,
+                size,
+                kind,
+                SymbolScope::Linkage,
+                false, // strong
+                SymbolFlags::None
+            )
+        }
+    }
+
+    with_no_at!{
         emit_bytes,
         #[inline(always)]
         pub fn emit_bytes_at(
@@ -1304,6 +1329,47 @@ impl<'a> Assembler<'a> {
                 (sym, RelocKind::Call),
             );
             self.emit_jalr(Reg::RA, Reg::T0, 0)
+        }
+    }
+
+    with_no_at! {
+        emit_call_label,
+        #[inline]
+        pub fn emit_call_label_at(
+            &mut self,
+            section: SectionId,
+            label: LabelId,
+        ) -> u64 {
+            self.emit_call_label_plt_at(
+                section,
+                label
+            )
+        }
+    }
+
+    with_no_at! {
+        emit_call_label_plt,
+        #[inline]
+        pub fn emit_call_label_plt_at(
+            &mut self,
+            section: SectionId,
+            label: LabelId,
+        ) -> u64 {
+            let sym = self.get_label(label).sym;
+            self.emit_call_plt_at(section, sym)
+        }
+    }
+
+    with_no_at! {
+        emit_call_label_direct,
+        #[inline]
+        pub fn emit_call_label_direct_at(
+            &mut self,
+            section: SectionId,
+            label: LabelId,
+        ) -> u64 {
+            let sym = self.get_label(label).sym;
+            self.emit_call_direct_at(section, sym)
         }
     }
 
