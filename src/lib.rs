@@ -1,4 +1,5 @@
 // TODO(#1): Implement tests
+// TODO(#22): Support variable word-sizes
 // TODO(#13): Support for `GOT` and `TLS` relocations
 //   e.g. R_RISCV_GOT_HI20 and R_RISCV_TLS_GD_HI20.
 //   For example, an instruction loading a 32‑bit address will generate an
