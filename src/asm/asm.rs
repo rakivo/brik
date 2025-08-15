@@ -798,7 +798,7 @@ impl<'a> Assembler<'a> {
         }
     }
 
-    // TODO: Make `resolve_local_relocs` work for 32-bit architectures
+    // TODO(#23): Make `resolve_local_relocs` work for 32-bit architectures
     pub fn resolve_local_relocs(&mut self) {
         debug_assert_eq!{
             self.arch,
