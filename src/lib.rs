@@ -1,11 +1,4 @@
 // TODO(#1): Implement tests
-// TODO(#10): Implement API for emission of COMDAT sections
-//   Support COMDAT grouping so that identically‑named sections (or data items) can be folded at link time.
-//   .e.g. template or inline function instantiations often require sections marked "any" or "same_size" COMDAT.
-//   The object API already has a `add_comdat(Comdat { name, kind }) -> ComdatId` and ability to associate sections with it.
-//   Expose this via the assembler: e.g. a directive or API `assembler.add_comdat(name, kind)`
-//   and then allow assigning a section to that COMDAT.
-//   On Mach-O/COFF this uses special auxiliary symbols under the hood, but on ELF it uses SHT_GROUP
 // TODO(#13): Support for `GOT` and `TLS` relocations
 //   e.g. R_RISCV_GOT_HI20 and R_RISCV_TLS_GD_HI20.
 //   For example, an instruction loading a 32‑bit address will generate an
