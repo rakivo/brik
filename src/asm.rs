@@ -56,6 +56,30 @@ use num_traits::{
     FromPrimitive,
 };
 
+pub type EmitFunctionPrologue = fn(&mut Assembler, SectionId) -> u64;
+pub type EmitFunctionEpilogue = fn(&mut Assembler, SectionId) -> u64;
+
+#[inline(always)]
+fn default_emit_function_prologue(
+    asm: &mut Assembler,
+    section: SectionId
+) -> u64 {
+    asm.emit_addi_at(section, Reg::SP, Reg::SP, -16);
+    asm.emit_sd_at(section,   Reg::RA, Reg::SP,   8);
+    asm.emit_sd_at(section,   Reg::S0, Reg::SP,   0);
+    asm.emit_addi_at(section, Reg::S0, Reg::SP,  16)
+}
+
+#[inline(always)]
+fn default_emit_function_epilogue(
+    asm: &mut Assembler,
+    section: SectionId
+) -> u64 {
+    asm.emit_ld_at(section,   Reg::RA, Reg::SP,  8);
+    asm.emit_ld_at(section,   Reg::S0, Reg::SP,  0);
+    asm.emit_addi_at(section, Reg::SP, Reg::SP, 16)
+}
+
 #[derive(Eq, Ord, Hash, Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct LabelId(usize);
 
@@ -99,6 +123,9 @@ pub struct Assembler<'a> {
 
     labels          : FxHashMap<LabelId, Label>,
     unplaced_labels : FxHashMap<LabelId, UnplacedLabelInfo>,
+
+    pub custom_emit_function_prologue: EmitFunctionPrologue,
+    pub custom_emit_function_epilogue: EmitFunctionEpilogue,
 }
 
 impl<'a> Deref for Assembler<'a> {
@@ -146,6 +173,9 @@ impl<'a> Assembler<'a> {
             relocs: Vec::with_capacity(
                 Self::RELOC_PREALLOCATION_COUNT
             ),
+
+            custom_emit_function_prologue: default_emit_function_prologue,
+            custom_emit_function_epilogue: default_emit_function_epilogue,
         };
 
         if asm.format == BinaryFormat::Elf {
@@ -1134,11 +1164,12 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    pub fn add_symbol_extern(
+    fn add_symbol_extern_(
         &mut self,
         name: impl AsRef<[u8]>,
         kind: SymbolKind,
         scope: SymbolScope,
+        weak: bool
     ) -> SymbolId {
         self.add_symbol_at(
             SymbolSection::Undefined,
@@ -1147,9 +1178,29 @@ impl<'a> Assembler<'a> {
             0,
             kind,
             scope,
-            false, // strong
+            weak,
             SymbolFlags::None
         )
+    }
+
+    #[inline(always)]
+    pub fn add_symbol_extern(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope,
+    ) -> SymbolId {
+        self.add_symbol_extern_(name, kind, scope, false)
+    }
+
+    #[inline(always)]
+    pub fn add_symbol_extern_weak(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope,
+    ) -> SymbolId {
+        self.add_symbol_extern_(name, kind, scope, true)
     }
 
     with_no_at!{
@@ -1245,31 +1296,33 @@ impl<'a> Assembler<'a> {
 
     with_no_at! {
         emit_function_prologue,
-        #[inline]
+        #[inline(always)]
         pub fn emit_function_prologue_at(&mut self, section: SectionId) -> u64 {
-            self.emit_bytes_at(
-                section,
-                I::ADDI { d: Reg::SP, s: Reg::SP, im: -16 },
-            );
-            self.emit_bytes_at(section, rv64::encode_sd(Reg::RA, Reg::SP, 8));
-            self.emit_bytes_at(section, rv64::encode_sd(Reg::S0, Reg::SP, 0));
-            self.emit_bytes_at(
-                section,
-                I::ADDI { d: Reg::S0, s: Reg::SP, im: 16 },
-            )
+            (self.custom_emit_function_prologue)(self, section)
+        }
+    }
+
+    with_no_at! {
+        emit_default_function_prologue,
+        #[inline(always)]
+        pub fn emit_default_function_prologue_at(&mut self, section: SectionId) -> u64 {
+            default_emit_function_prologue(self, section)
         }
     }
 
     with_no_at! {
         emit_function_epilogue,
-        #[inline]
+        #[inline(always)]
         pub fn emit_function_epilogue_at(&mut self, section: SectionId) -> u64 {
-            self.emit_bytes_at(section, rv64::encode_ld(Reg::RA, Reg::SP, 8));
-            self.emit_bytes_at(section, rv64::encode_ld(Reg::S0, Reg::SP, 0));
-            self.emit_bytes_at(
-                section,
-                I::ADDI { d: Reg::SP, s: Reg::SP, im: 16 },
-            )
+            (self.custom_emit_function_epilogue)(self, section)
+        }
+    }
+
+    with_no_at! {
+        emit_default_function_epilogue,
+        #[inline(always)]
+        pub fn emit_default_function_epilogue_at(&mut self, section: SectionId) -> u64 {
+            default_emit_function_epilogue(self, section)
         }
     }
 
