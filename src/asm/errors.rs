@@ -6,7 +6,6 @@ use crate::util::diag::{
     UnplacedLabelDiagnostic
 };
 
-use std::format;
 use std::vec::Vec;
 use std::string::String;
 use std::borrow::ToOwned;
@@ -44,7 +43,7 @@ impl FinishError {
         let renderer = DiagnosticRenderer::default();
 
         #[cfg(feature = "std")]
-        let mut file_cache = FxHashMap::<_, Arc<str>>::default();
+        let mut file_cache = rustc_hash::FxHashMap::<_, Arc<str>>::default();
 
         let unplaced_labels = mem::take(&mut asm.unplaced_labels);
 
@@ -58,7 +57,7 @@ impl FinishError {
             let file_path = info.caller_loc.file();
 
             #[cfg(feature = "no_std")] {
-                format!{
+                std::format!{
                     "error: unplaced label '{label_name}'\n --> {f}:{l}:{c}",
                     f = file_path,
                     l = info.caller_loc.line(),
