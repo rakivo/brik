@@ -25,9 +25,12 @@ use crate::object::{
 use crate::object::write::{
     Symbol,
     Object,
+    Comdat,
+    ComdatId,
     SymbolId,
     FileFlags,
     SectionId,
+    ComdatKind,
     Relocation,
     SymbolSection,
     RelocationFlags,
@@ -540,6 +543,71 @@ impl<'a> Assembler<'a> {
             self.emit_zeroes(pad as _);
         }
     }
+
+    // --------- COMDAT SECTION MANAGEMENT ----------
+
+    /// Add a new COMDAT section group and return its `ComdatId`.
+    #[inline(always)]
+    pub fn add_comdat(
+        &mut self,
+        kind: ComdatKind,
+        symbol: SymbolId
+    ) -> ComdatId {
+        self.obj.add_comdat(Comdat {
+            kind,
+            symbol,
+            sections: const { Vec::new() }
+        })
+    }
+
+    /// Append section to a COMDAT section group
+    #[inline(always)]
+    pub fn add_section_to_comdat(
+        &mut self,
+        section: SectionId,
+        comdat_id: ComdatId,
+    ) {
+        self.obj.comdat_mut(comdat_id).sections.push(section);
+    }
+
+    /// Append section to a COMDAT section group
+    #[inline(always)]
+    pub fn add_section_to_comdat_if_not_added(
+        &mut self,
+        section: SectionId,
+        comdat_id: ComdatId,
+    ) -> bool {
+        let sections = &mut self.obj.comdat_mut(comdat_id).sections;
+        if sections.contains(&section) {
+            return true
+        }
+
+        sections.push(section);
+        false
+    }
+
+    /// Get slice of all sections in a COMDAT section group
+    #[inline(always)]
+    pub fn comdat_sections(&self, comdat_id: ComdatId) -> &[SectionId] {
+        &self.obj.comdat(comdat_id).sections
+    }
+
+    with_at_end!{
+        #[inline]
+        pub fn add_section_and_add_to_comdat(
+            &mut self,
+            segment: StandardSegment,
+            name: &[u8],
+            kind: SectionKind,
+            comdat_id: ComdatId
+        ) -> SectionId {
+            let section = self.add_section(segment, name, kind);
+            self.add_section_to_comdat(section, comdat_id);
+            section
+        }
+    }
+
+    // -----------------------------------
 
     with_at_end!{
         /// Add a text section
