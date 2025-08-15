@@ -32,6 +32,7 @@ use crate::object::write::{
     SectionId,
     ComdatKind,
     Relocation,
+    SectionFlags,
     SymbolSection,
     RelocationFlags,
     StandardSegment,
@@ -599,7 +600,7 @@ impl<'a> Assembler<'a> {
         pub fn add_section_and_add_to_comdat(
             &mut self,
             segment: StandardSegment,
-            name: &[u8],
+            name: impl AsRef<[u8]>,
             kind: SectionKind,
             comdat_id: ComdatId
         ) -> SectionId {
@@ -642,9 +643,9 @@ impl<'a> Assembler<'a> {
             self.add_section(
                 StandardSegment::Data,
                 if self.format == BinaryFormat::Coff {
-                    b".rdata"
+                    b".rdata".as_ref()
                 } else {
-                    b".rodata"
+                    b".rodata".as_ref()
                 },
                 SectionKind::ReadOnlyData
             )
@@ -668,18 +669,50 @@ impl<'a> Assembler<'a> {
         pub fn add_section(
             &mut self,
             segment: StandardSegment,
-            name: &[u8],
+            name: impl AsRef<[u8]>,
             kind: SectionKind,
         ) -> SectionId {
             self.obj.add_section(
                 self.segment_name(segment).to_vec(),
-                name.to_vec(),
+                name.as_ref().to_vec(),
                 kind,
             )
         }
     }
 
-    // -----
+    // --------- SECTION FLAGS MANAGEMENT ---------
+
+    with_at_end!{
+        #[inline]
+        pub fn add_section_with_flags(
+            &mut self,
+            segment: StandardSegment,
+            name: impl AsRef<[u8]>,
+            kind: SectionKind,
+            flags: SectionFlags
+        ) -> SectionId {
+            let section = self.add_section(
+                segment,
+                name,
+                kind
+            );
+
+            self.set_section_flags(section, flags);
+
+            section
+        }
+    }
+
+    #[inline(always)]
+    pub fn set_section_flags(
+        &mut self,
+        section: SectionId,
+        flags: SectionFlags
+    ) {
+        *self.section_flags_mut(section) = flags
+    }
+
+    // --------------------------
 
     #[inline]
     pub fn next_pcrel_label(
@@ -709,7 +742,7 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    fn add_label_(&mut self, name: &[u8], offset: u64) -> Label {
+    fn add_label_(&mut self, name: impl AsRef<[u8]>, offset: u64) -> Label {
         let sym = self.add_symbol(
             name,
             offset,
@@ -724,7 +757,7 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    pub fn add_label_here(&mut self, name: &[u8]) -> LabelId {
+    pub fn add_label_here(&mut self, name: impl AsRef<[u8]>) -> LabelId {
         let curr_offset = self.curr_offset();
         let l = self.add_label_(name, curr_offset);
         let id = self.next_brik_lbl_id();
@@ -734,13 +767,15 @@ impl<'a> Assembler<'a> {
 
     #[inline]
     #[track_caller]
-    pub fn declare_label(&mut self, name: &[u8]) -> LabelId {
+    pub fn declare_label(&mut self, name: impl AsRef<[u8]>) -> LabelId {
         let l = self.add_label_(name, 0);
         let id = self.next_brik_lbl_id();
         self.labels.insert(id, l);
+
         self.unplaced_labels.insert(id, UnplacedLabelInfo {
             caller_loc: panic::Location::caller()
         });
+
         id
     }
 
@@ -991,14 +1026,14 @@ impl<'a> Assembler<'a> {
     pub fn add_comm_symbol_at(
         &mut self,
         section: SymbolSection,
-        name: &[u8],
+        name: impl AsRef<[u8]>,
         size: u64,
         align: u64,
         weak: bool
     ) -> SymbolId {
         self.obj.add_common_symbol(
             Symbol {
-                name: name.to_vec(),
+                name: name.as_ref().to_vec(),
                 value: 0,
                 size,
                 kind: SymbolKind::Data,
@@ -1015,7 +1050,7 @@ impl<'a> Assembler<'a> {
     #[inline]
     pub fn add_comm_symbol(
         &mut self,
-        name: &[u8],
+        name: impl AsRef<[u8]>,
         size: u64,
         align: u64,
         weak: bool
@@ -1101,20 +1136,20 @@ impl<'a> Assembler<'a> {
     #[inline]
     pub fn add_symbol_extern(
         &mut self,
-        name: &[u8],
+        name: impl AsRef<[u8]>,
         kind: SymbolKind,
         scope: SymbolScope,
     ) -> SymbolId {
-        self.obj.add_symbol(Symbol {
-            name: name.to_vec(),
-            value: 0,
-            size: 0,
+        self.add_symbol_at(
+            SymbolSection::Undefined,
+            name,
+            0,
+            0,
             kind,
             scope,
-            weak: false,
-            section: SymbolSection::Undefined,
-            flags: SymbolFlags::None,
-        })
+            false, // strong
+            SymbolFlags::None
+        )
     }
 
     with_no_at!{
