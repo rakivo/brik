@@ -81,7 +81,7 @@ macro_rules! with_at_end {
         $(-> $ret)?
         $body
 
-        // TODO: Stop using paste in macros as it is bad for lsp jumping
+        // TODO(#21): Stop using paste in macros as it is bad for lsp jumping
         paste::paste! {
             #[inline(always)]
             $vis fn [<$name _at_end>]
