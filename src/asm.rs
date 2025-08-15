@@ -213,6 +213,7 @@ impl<'a> Assembler<'a> {
         use std::{fs, sync::Arc};
 
         #[cfg(feature = "std")]
+        #[allow(clippy::default_constructed_unit_structs)]
         let renderer = DiagnosticRenderer::default();
 
         #[cfg(feature = "std")]
