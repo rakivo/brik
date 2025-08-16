@@ -6,6 +6,7 @@ use crate::util::diag::{
     UnplacedLabelDiagnostic
 };
 
+use std::str;
 use std::vec::Vec;
 use std::string::String;
 use std::borrow::ToOwned;
@@ -56,7 +57,7 @@ impl FinishError {
 
             let file_path = info.caller_loc.file();
 
-            #[cfg(feature = "no_std")] {
+            #[cfg(not(feature = "std"))] {
                 std::format!{
                     "error: unplaced label '{label_name}'\n --> {f}:{l}:{c}",
                     f = file_path,

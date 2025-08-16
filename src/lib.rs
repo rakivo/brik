@@ -24,6 +24,7 @@ pub mod util;
 pub mod asm;
 pub mod rv32;
 pub mod rv64;
+pub mod opcode;
 pub mod misc_enc;
 
 pub use object;

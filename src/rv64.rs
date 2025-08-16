@@ -2,8 +2,8 @@
 
 use crate::util::misc;
 use crate::rv32::{I, Reg};
-use crate::util::opcode::AqRl;
-use crate::util::opcode::RV64Opcode::*;
+use crate::opcode::AqRl;
+use crate::opcode::RV64Opcode::*;
 use crate::util::into_bytes::IntoBytes;
 
 use core::mem;

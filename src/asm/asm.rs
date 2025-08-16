@@ -7,8 +7,9 @@ use crate::{rv64, misc_enc};
 use crate::util::into_bytes::IntoBytes;
 use crate::asm::label::{Label, LabelId};
 use crate::asm::arch::{Arch, AddressSize};
-use crate::asm::reloc::{Reloc, PcrelPart, RelocKind};
+use crate::util::compat_fn::CompatFnWrapper;
 use crate::util::attr_builder::RiscvAttrsBuilder;
+use crate::asm::reloc::{Reloc, PcrelPart, RelocKind};
 use crate::asm::errors::{
     FinishError,
     UnplacedLabelInfo
@@ -56,12 +57,12 @@ use num_traits::{
     FromPrimitive,
 };
 
-pub type EmitFunctionPrologue = fn(&mut Assembler, SectionId) -> u64;
-pub type EmitFunctionEpilogue = fn(&mut Assembler, SectionId) -> u64;
+pub type EmitFunctionPrologue = fn(&mut Assembler<'_>, SectionId) -> u64;
+pub type EmitFunctionEpilogue = fn(&mut Assembler<'_>, SectionId) -> u64;
 
 #[inline(always)]
 fn default_emit_function_prologue(
-    asm: &mut Assembler,
+    asm: &mut Assembler<'_>,
     section: SectionId
 ) -> u64 {
     let ptr_size = asm.address_bytes() as i16;
@@ -74,7 +75,7 @@ fn default_emit_function_prologue(
 
 #[inline(always)]
 fn default_emit_function_epilogue(
-    asm: &mut Assembler,
+    asm: &mut Assembler<'_>,
     section: SectionId
 ) -> u64 {
     let ptr_size = asm.address_bytes() as i16;
@@ -103,8 +104,8 @@ pub struct Assembler<'a> {
     labels: FxHashMap<LabelId, Label>,
     pub(crate) unplaced_labels: FxHashMap<LabelId, UnplacedLabelInfo>,
 
-    pub custom_emit_function_prologue: EmitFunctionPrologue,
-    pub custom_emit_function_epilogue: EmitFunctionEpilogue,
+    custom_emit_function_prologue: CompatFnWrapper<EmitFunctionPrologue>,
+    custom_emit_function_epilogue: CompatFnWrapper<EmitFunctionEpilogue>,
 }
 
 impl<'a> Deref for Assembler<'a> {
@@ -167,8 +168,8 @@ impl<'a> Assembler<'a> {
                 Self::RELOC_PREALLOCATION_COUNT
             ),
 
-            custom_emit_function_prologue: default_emit_function_prologue,
-            custom_emit_function_epilogue: default_emit_function_epilogue,
+            custom_emit_function_prologue: CompatFnWrapper(default_emit_function_prologue),
+            custom_emit_function_epilogue: CompatFnWrapper(default_emit_function_epilogue),
         };
 
         if asm.format == BinaryFormat::Elf {
@@ -201,13 +202,23 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline(always)]
-    pub const fn position_at_end(&mut self, section: SectionId) {
+    pub fn position_at_end(&mut self, section: SectionId) {
         self.curr_section = Some(section)
     }
 
     #[inline(always)]
-    pub const fn set_object_flags(&mut self, flags: FileFlags) {
+    pub fn set_object_flags(&mut self, flags: FileFlags) {
         self.obj.flags = flags
+    }
+
+    #[inline(always)]
+    pub fn set_custom_emit_function_prologue(&mut self, f: EmitFunctionPrologue) {
+        self.custom_emit_function_prologue = CompatFnWrapper(f)
+    }
+
+    #[inline(always)]
+    pub fn set_custom_emit_function_epilogue(&mut self, f: EmitFunctionEpilogue) {
+        self.custom_emit_function_epilogue = CompatFnWrapper(f)
     }
 
     #[inline(always)]
@@ -217,17 +228,17 @@ impl<'a> Assembler<'a> {
 
     #[inline(always)]
     pub const fn address_size(&self) -> AddressSize {
-        self.arch.address_size()
+        self.arch().address_size()
     }
 
     #[inline(always)]
     pub const fn address_bytes(&self) -> u8 {
-        self.arch.address_size().bytes()
+        self.arch().address_size().bytes()
     }
 
     #[inline(always)]
     pub const fn address_bits(&self) -> u8 {
-        self.arch.address_size().bits()
+        self.arch().address_size().bits()
     }
 
     #[must_use]
@@ -511,7 +522,7 @@ impl<'a> Assembler<'a> {
     #[must_use]
     #[track_caller]
     #[inline(always)]
-    pub const fn expect_curr_section(&self) -> SectionId {
+    pub fn expect_curr_section(&self) -> SectionId {
         self.curr_section().expect("no current section set")
     }
 
@@ -543,7 +554,7 @@ impl<'a> Assembler<'a> {
         self.obj.add_comdat(Comdat {
             kind,
             symbol,
-            sections: const { Vec::new() }
+            sections: Vec::default()
         })
     }
 
@@ -981,17 +992,12 @@ impl<'a> Assembler<'a> {
         self.labels.get_mut(&lbl_id).unwrap()
     }
 
-    #[inline(always)]
-    pub fn try_remove_from_unplaced(&mut self, lbl_id: LabelId) {
-        _ = self.unplaced_labels.remove(&lbl_id)
-    }
-
     #[inline]
     pub fn place_label_at(&mut self, lbl_id: LabelId, offset: u64) {
         let label = self.get_label(lbl_id);
         let sym = &mut self.obj.symbol_mut(label.sym);
         sym.value = offset;
-        self.try_remove_from_unplaced(lbl_id);
+        _ = self.unplaced_labels.remove(&lbl_id)
     }
 
     #[inline]

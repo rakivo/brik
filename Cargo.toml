@@ -1,8 +1,9 @@
 [package]
 name = "brik"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 authors = ["Mark Tyrkba <marktyrkba456@gmail.com>"]
+rust-version = "1.68.2"
 
 [dependencies]
 brik_rv32  = { version = "0.2.0",   default-features = false, git = "https://github.com/rakivo/brik_rv32.git", rev = "7add182" }
@@ -15,16 +16,22 @@ num-traits = { version = "=0.2.19", default-features = false }
 anyhow     = { version = "1.0.99",  default-features = false }
 rustc-hash = { version = "2.1.1",   default-features = false, features = ["std"]   }
 object     = { version = "~0.37.3", default-features = false, features = ["write"] }
-miette     = { version = "5",       default-features = false, features = ["fancy"], optional = true }
+miette     = { version = "7.6.0",   default-features = false, features = ["fancy"], optional = true }
 
 [features]
-# default = ["no_std"]
-default = ["std", "fancy-diagnostics"]
+default = []
+# default = ["std", "fancy-diagnostics"]
 
-fancy-diagnostics = ["miette/fancy"]
+fancy-diagnostics = ["miette/fancy", "std"]
 
-no_std = []
-std = ["rustc-hash/std", "memchr/std", "num-traits/std", "anyhow/std", "object/std", "object/write_std"]
+std = [
+    "rustc-hash/std",
+    "memchr/std",
+    "num-traits/std",
+    "anyhow/std",
+    "object/std",
+    "object/write_std"
+]
 
 elf     = ["object/elf"]
 coff    = ["object/coff"]
