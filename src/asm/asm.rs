@@ -191,7 +191,7 @@ impl<'a> Assembler<'a> {
         asm
     }
 
-    /// Finish object emission
+    /// Finishes object emission
     #[inline]
     pub fn finish(mut self) -> Result<Object<'a>, FinishError> {
         if self.unplaced_labels.is_empty() {
@@ -203,6 +203,7 @@ impl<'a> Assembler<'a> {
         Err(FinishError::from_asm(self))
     }
 
+    /// Sets current section to `section`
     #[inline(always)]
     pub fn position_at_end(&mut self, section: SectionId) {
         self.curr_section = Some(section)
@@ -615,6 +616,7 @@ impl<'a> Assembler<'a> {
     }
 
     with_at_end!{
+        add_section_and_add_to_comdat_at_end,
         #[inline]
         pub fn add_section_and_add_to_comdat(
             &mut self,
@@ -632,7 +634,8 @@ impl<'a> Assembler<'a> {
     // -----------------------------------
 
     with_at_end!{
-        /// Add a text section
+        add_text_section_at_end,
+        /// Add a text section.
         #[inline(always)]
         pub fn add_text_section(&mut self) -> SectionId {
             self.add_section(
@@ -644,7 +647,8 @@ impl<'a> Assembler<'a> {
     }
 
     with_at_end!{
-        /// Add a data section
+        add_data_section_at_end,
+        /// Add a data section.
         #[inline]
         pub fn add_data_section(&mut self) -> SectionId {
             self.add_section(
@@ -656,7 +660,8 @@ impl<'a> Assembler<'a> {
     }
 
     with_at_end!{
-        /// Add a read-only data section
+        add_rodata_section_at_end,
+        /// Add a read-only data section.
         #[inline]
         pub fn add_rodata_section(&mut self) -> SectionId {
             self.add_section(
@@ -672,7 +677,8 @@ impl<'a> Assembler<'a> {
     }
 
     with_at_end!{
-        /// Add a BSS section
+        add_bss_section_at_end,
+        /// Add a BSS section.
         #[inline]
         pub fn add_bss_section(&mut self) -> SectionId {
             self.add_section(
@@ -684,6 +690,10 @@ impl<'a> Assembler<'a> {
     }
 
     with_at_end!{
+        add_section_at_end,
+        /// Add a new section and return its `SectionId`.
+        ///
+        /// This also creates a section symbol.
         #[inline]
         pub fn add_section(
             &mut self,
@@ -702,6 +712,7 @@ impl<'a> Assembler<'a> {
     // --------- SECTION FLAGS MANAGEMENT ---------
 
     with_at_end!{
+        add_section_with_flags_at_end,
         #[inline]
         pub fn add_section_with_flags(
             &mut self,

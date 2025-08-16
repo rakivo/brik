@@ -172,13 +172,11 @@ macro_rules! debug_from_display {
     };
 }
 
-macro_rules! assembler_doclink {
+macro_rules! assembler_method {
     ($name: ident) => {
         concat!{
-            "For details, see: [`",
             "crate::asm::Assembler::",
             stringify!($name),
-            "`]"
         }
     };
 }
@@ -186,6 +184,7 @@ macro_rules! assembler_doclink {
 // TODO(#20): Make `with_at_end!` support for generics and `where` clauses
 macro_rules! with_at_end {
     (
+        $at_end_name:ident,
         $(#[$meta:meta])*
         $vis:vis fn $name:ident
         $(<$($generics:tt),*>)?
@@ -200,21 +199,22 @@ macro_rules! with_at_end {
         $(-> $ret)?
         $body
 
-        // TODO(#21): Stop using paste in macros as it is bad for lsp jumping
-        paste::paste! {
-            $(#[$meta])*
-            #[inline(always)]
-            #[allow(unused_attributes)]
-            #[doc = assembler_doclink!($name)]
-            $vis fn [<$name _at_end>]
-            $(<$($generics),*>)?
-            (&mut $self $(, $param_name: $param_type)*)
-            $(-> $ret)?
-            {
-                let sid = $self.$name($($param_name),*);
-                $self.position_at_end(sid);
-                sid
-            }
+        $(#[$meta])*
+        #[inline(always)]
+        #[allow(unused_attributes)]
+        #[doc = concat!{
+            "Calls [`",
+            assembler_method!($name),
+            "`] and sets current section to the created one"
+        }]
+        $vis fn $at_end_name
+        $(<$($generics),*>)?
+        (&mut $self $(, $param_name: $param_type)*)
+        $(-> $ret)?
+        {
+            let sid = $self.$name($($param_name),*);
+            $self.position_at_end(sid);
+            sid
         }
     };
 }
@@ -245,7 +245,11 @@ macro_rules! with_no_at {
         #[track_caller]
         #[inline(always)]
         #[allow(unused_attributes)]
-        #[doc = assembler_doclink!($name_at)]
+        #[doc = concat!{
+            "Calls [`",
+            assembler_method!($name_at),
+            "`] with current section"
+        }]
         $vis fn $no_at_name
         $(<$($generics),*>)?
         (&mut $self $(, $arg: $ty)*)
@@ -280,7 +284,11 @@ macro_rules! with_no_at {
         #[track_caller]
         #[inline(always)]
         #[allow(unused_attributes)]
-        #[doc = assembler_doclink!($name_at)]
+        #[doc = concat!{
+            "Calls [`",
+            assembler_method!($name_at),
+            "`] with current section"
+        }]
         pub fn $no_at_name
         $(<$($generics),*>)?
         (&mut $self $(, $arg: $ty)*)
