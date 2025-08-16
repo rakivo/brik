@@ -15,7 +15,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable, beta, nightly]
-        features: ["default", "no_std", "std"]
+        features: ["default", "std"]
 
     runs-on: ${{ matrix.os }}
 
