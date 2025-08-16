@@ -1,4 +1,4 @@
-use brik::rv32::Reg;
+use brik::rv32::Reg::*;
 use brik::asm::Assembler;
 use brik::asm::arch::Arch;
 use brik::object::{
@@ -45,13 +45,13 @@ fn produce_add_34_35_obj<'a>() -> Object<'a> {
     asm.emit_function_prologue();
 
     // a0 = fmt
-    asm.emit_pcrel_load_addr(Reg::A0, fmt_sym);
+    asm.emit_pcrel_load_addr(A0, fmt_sym);
 
     // a1 = 34
-    asm.emit_li(Reg::A1, 34);
+    asm.emit_li(A1, 34);
 
     // a1 += 35
-    asm.emit_addi(Reg::A1, Reg::A1, 35);
+    asm.emit_addi(A1, A1, 35);
 
     asm.emit_call_plt(printf_sym);
 

@@ -1,5 +1,5 @@
-use brik::rv64;
-use brik::rv32::{I, Reg};
+use brik::rv32::I32::*;
+use brik::rv32::Reg::*;
 use brik::asm::Assembler;
 use brik::asm::arch::Arch;
 use brik::object::{
@@ -58,25 +58,25 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.emit_function_prologue();
 
     // allocate space on stack for input number (8 bytes)
-    asm.emit_addi(Reg::SP, Reg::SP, -8);
+    asm.emit_addi(SP, SP, -8);
 
     // print input prompt
-    asm.emit_pcrel_load_addr(Reg::A0, input_fmt_sym);
+    asm.emit_pcrel_load_addr(A0, input_fmt_sym);
     asm.emit_call_plt(printf_sym);
 
     // read input number
-    asm.emit_pcrel_load_addr(Reg::A0, scanf_fmt_sym);
-    asm.emit_addi(Reg::A1, Reg::SP, 0);
+    asm.emit_pcrel_load_addr(A0, scanf_fmt_sym);
+    asm.emit_addi(A1, SP, 0);
     asm.emit_call_plt(scanf_sym);
 
     // load input number into s1
-    asm.emit_ld(Reg::S1, Reg::SP, 0);
+    asm.emit_ld(S1, SP, 0);
 
     // init factorial result in s2 (result = 1)
-    asm.emit_addi(Reg::S2, Reg::ZERO, 1);
+    asm.emit_addi(S2, ZERO, 1);
 
     // init counter in s3 (i = 1)
-    asm.emit_addi(Reg::S3, Reg::ZERO, 1);
+    asm.emit_addi(S3, ZERO, 1);
 
     let loop_lbl = asm.add_label_here(b".fact_loop");
     let done_lbl = asm.declare_label(b".fact_done");
@@ -85,31 +85,31 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.emit_branch_to(
         done_lbl,
         // if s1 < s3 (n < i)
-        I::BLT { s1: Reg::S1, s2: Reg::S3, im: 0 },
+        BLT { s1: S1, s2: S3, im: 0 },
     );
 
     // result *= i
-    asm.emit_bytes(rv64::encode_mul(Reg::S2, Reg::S2, Reg::S3));
+    asm.emit_bytes(MUL { d: S2, s1: S2, s2: S3 });
 
     // i++
-    asm.emit_addi(Reg::S3, Reg::S3, 1);
+    asm.emit_addi(S3, S3, 1);
 
     // jump back to loop
     asm.emit_branch_to(
         loop_lbl,
-        I::JAL { d: Reg::ZERO, im: 0 },
+        JAL { d: ZERO, im: 0 },
     );
 
     asm.place_label_here(done_lbl);
 
     // print result
-    asm.emit_pcrel_load_addr(Reg::A0, result_fmt_sym);
-    asm.emit_mv(Reg::A1, Reg::S2); // move result to a1
-    asm.emit_addi(Reg::A1, Reg::S2, 0);
+    asm.emit_pcrel_load_addr(A0, result_fmt_sym);
+    asm.emit_mv(A1, S2); // move result to a1
+    asm.emit_addi(A1, S2, 0);
     asm.emit_call_plt(printf_sym);
 
     // restore stack and return
-    asm.emit_addi(Reg::SP, Reg::SP, 8);
+    asm.emit_addi(SP, SP, 8);
     asm.emit_function_epilogue();
     asm.emit_return_imm(0);
 

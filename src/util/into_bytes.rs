@@ -1,7 +1,5 @@
 //! Helper trait for converting T to bytes
 
-use crate::rv32;
-
 use std::vec::Vec;
 use std::borrow::Cow;
 
@@ -63,10 +61,17 @@ impl<'a, A: smallvec::Array<Item = u8>> IntoBytes<'a> for SmallVec<A> {
     }
 }
 
-impl<'a> IntoBytes<'a> for rv32::I {
+impl<'a> IntoBytes<'a> for crate::rv32::I32 {
     #[inline(always)]
     fn into_bytes(self) -> Cow<'a, [u8]> {
-        u32::from(self).into_bytes()
+        self.into_u32().into_bytes()
+    }
+}
+
+impl<'a> IntoBytes<'a> for crate::rv64::I64 {
+    #[inline(always)]
+    fn into_bytes(self) -> Cow<'a, [u8]> {
+        self.into_u32().into_bytes()
     }
 }
 

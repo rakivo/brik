@@ -1,5 +1,6 @@
+use brik::rv32::I32::*;
+use brik::rv32::Reg::*;
 use brik::asm::Assembler;
-use brik::rv32::{I, Reg};
 use brik::asm::arch::Arch;
 use brik::object::{
     Endianness,
@@ -46,25 +47,25 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.emit_function_prologue();
 
     // s1 = count
-    asm.emit_pcrel_load_addr(Reg::S1, countdown_sym);
-    asm.emit_ld(Reg::S1, Reg::S1, 0);
+    asm.emit_pcrel_load_addr(S1, countdown_sym);
+    asm.emit_ld(S1, S1, 0);
 
     let loop_lbl = asm.add_label_here(b".loop");
 
     // a0 = msg
-    asm.emit_pcrel_load_addr(Reg::A0, msg_sym);
+    asm.emit_pcrel_load_addr(A0, msg_sym);
 
     asm.emit_call_plt(printf_sym);
 
     // s1 -= 1
-    asm.emit_addi(Reg::S1, Reg::S1, -1);
+    asm.emit_addi(S1, S1, -1);
 
     // blt 0, s1
     asm.emit_branch_to(
         loop_lbl,
-        I::BLT {
-            s1: Reg::ZERO,
-            s2: Reg::S1,
+        BLT {
+            s1: ZERO,
+            s2: S1,
             im: 0
         }
     );

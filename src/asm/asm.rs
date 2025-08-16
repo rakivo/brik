@@ -1,9 +1,11 @@
 //! Object file builder
 
-use crate::rv32;
 use crate::util::misc;
-use crate::rv32::{I, Reg};
-use crate::{rv64, misc_enc};
+use crate::rv32::AqRl;
+use crate::rv64::I64::*;
+use crate::rv32::Reg::{self, *};
+use crate::rv32::I32::{self, *};
+use crate::misc_enc::{leb128, pseudo};
 use crate::util::into_bytes::IntoBytes;
 use crate::asm::label::{Label, LabelId};
 use crate::asm::arch::{Arch, AddressSize};
@@ -67,10 +69,10 @@ fn default_emit_function_prologue(
 ) -> u64 {
     let ptr_size = asm.address_bytes() as i16;
 
-    asm.emit_addi_at(section, Reg::SP, Reg::SP, -ptr_size * 2);
-    asm.emit_sd_at(section,   Reg::RA, Reg::SP, ptr_size);
-    asm.emit_sd_at(section,   Reg::S0, Reg::SP, 0);
-    asm.emit_addi_at(section, Reg::S0, Reg::SP, ptr_size * 2)
+    asm.emit_addi_at(section, SP, SP, -ptr_size * 2);
+    asm.emit_sd_at(section,   RA, SP, ptr_size);
+    asm.emit_sd_at(section,   S0, SP, 0);
+    asm.emit_addi_at(section, S0, SP, ptr_size * 2)
 }
 
 #[inline(always)]
@@ -80,9 +82,9 @@ fn default_emit_function_epilogue(
 ) -> u64 {
     let ptr_size = asm.address_bytes() as i16;
 
-    asm.emit_ld_at(section,   Reg::RA, Reg::SP, ptr_size);
-    asm.emit_ld_at(section,   Reg::S0, Reg::SP, 0);
-    asm.emit_addi_at(section, Reg::SP, Reg::SP, ptr_size * 2)
+    asm.emit_ld_at(section,   RA, SP, ptr_size);
+    asm.emit_ld_at(section,   S0, SP, 0);
+    asm.emit_addi_at(section, SP, SP, ptr_size * 2)
 }
 
 /// Object file builder
@@ -295,7 +297,7 @@ impl<'a> Assembler<'a> {
     where
         T: PrimInt + Unsigned + FromPrimitive + ToPrimitive
     {
-        let bytes = misc_enc::leb128::encode_uleb128(value);
+        let bytes = leb128::encode_uleb128(value);
         self.emit_bytes_at(section, bytes)
     }
 
@@ -313,7 +315,7 @@ impl<'a> Assembler<'a> {
     where
         T: PrimInt + Signed + FromPrimitive + ToPrimitive
     {
-        let bytes = misc_enc::leb128::encode_sleb128(value);
+        let bytes = leb128::encode_sleb128(value);
         self.emit_bytes_at(section, bytes)
     }
 
@@ -413,7 +415,7 @@ impl<'a> Assembler<'a> {
             s2: Reg,
             funct7: u32
         ) -> u64 {
-            self.emit_bytes_at(section, I::r(opcode, d, funct3, s1, s2, funct7))
+            self.emit_bytes_at(section, I32::r(opcode, d, funct3, s1, s2, funct7))
         }
     }
 
@@ -429,7 +431,7 @@ impl<'a> Assembler<'a> {
             s: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::i(opcode, d, funct3, s, im))
+            self.emit_bytes_at(section, I32::i(opcode, d, funct3, s, im))
         }
     }
 
@@ -447,7 +449,7 @@ impl<'a> Assembler<'a> {
             im: i8,
             funct7: u32
         ) -> u64 {
-            self.emit_bytes_at(section, I::i7(opcode, d, funct3, s, im, funct7))
+            self.emit_bytes_at(section, I32::i7(opcode, d, funct3, s, im, funct7))
         }
     }
 
@@ -463,7 +465,7 @@ impl<'a> Assembler<'a> {
             s2: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::s(opcode, funct3, s1, s2, im))
+            self.emit_bytes_at(section, I32::s(opcode, funct3, s1, s2, im))
         }
     }
 
@@ -479,7 +481,7 @@ impl<'a> Assembler<'a> {
             s2: Reg,
             im_b: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::b(opcode, funct3, s1, s2, im_b))
+            self.emit_bytes_at(section, I32::b(opcode, funct3, s1, s2, im_b))
         }
     }
 
@@ -493,7 +495,7 @@ impl<'a> Assembler<'a> {
             d: Reg,
             im: i32
         ) -> u64 {
-            self.emit_bytes_at(section, I::u(opcode, d, im))
+            self.emit_bytes_at(section, I32::u(opcode, d, im))
         }
     }
 
@@ -507,7 +509,28 @@ impl<'a> Assembler<'a> {
             d: Reg,
             im_j: i32
         ) -> u64 {
-            self.emit_bytes_at(section, I::j(opcode, d, im_j))
+            self.emit_bytes_at(section, I32::j(opcode, d, im_j))
+        }
+    }
+
+    with_no_at! {
+        emit_amo,
+        #[inline(always)]
+        pub fn emit_amo_at(
+            &mut self,
+            section: SectionId,
+            opcode: u32,
+            rd: Reg,
+            funct3: u32,
+            rs1: Reg,
+            rs2: Reg,
+            aqrl: AqRl,
+            funct5: u32
+        ) -> u64 {
+            self.emit_bytes_at(
+                section,
+                I32::amo(opcode, rd, funct3, rs1, rs2, aqrl, funct5)
+            )
         }
     }
 
@@ -948,13 +971,13 @@ impl<'a> Assembler<'a> {
             &mut self,
             section: SectionId,
             lbl_id: LabelId,
-            i: rv32::I
+            i: I32
         ) -> u64 {
             let rtype = match i {
-                I::JAL { .. } => RelocKind::Jal,
-                I::BEQ { .. }  | I::BNE { .. } |
-                I::BLT { .. }  | I::BGE { .. } |
-                I::BLTU { .. } | I::BGEU { .. } => RelocKind::Branch,
+                JAL { .. } => RelocKind::Jal,
+                BEQ { .. }  | BNE { .. } |
+                BLT { .. }  | BGE { .. } |
+                BLTU { .. } | BGEU { .. } => RelocKind::Branch,
                 _ => unimplemented!("unsupported branch instruction type"),
             };
 
@@ -1294,13 +1317,13 @@ impl<'a> Assembler<'a> {
         ) -> u64 {
             let hi_offset = self.emit_bytes_with_reloc_at(
                 section,
-                I::AUIPC { d: rd, im: 0 },
+                AUIPC { d: rd, im: 0 },
                 (target_sym, RelocKind::PcrelHi20),
             );
             let label = self.create_pcrel_hi_label_at(section, hi_offset);
             self.emit_bytes_with_reloc_at(
                 section,
-                I::ADDI { d: rd, s: rd, im: 0 },
+                ADDI { d: rd, s: rd, im: 0 },
                 (label, RelocKind::PcrelLo12I),
             )
         }
@@ -1316,10 +1339,10 @@ impl<'a> Assembler<'a> {
         ) -> u64 {
             self.emit_bytes_with_reloc_at(
                 section,
-                I::AUIPC { d: Reg::T0, im: 0 },
+                AUIPC { d: T0, im: 0 },
                 (target_sym, RelocKind::CallPlt),
             );
-            self.emit_jalr(Reg::RA, Reg::T0, 0)
+            self.emit_jalr(RA, T0, 0)
         }
     }
 
@@ -1333,10 +1356,10 @@ impl<'a> Assembler<'a> {
         ) -> u64 {
             self.emit_bytes_with_reloc_at(
                 section,
-                I::AUIPC { d: Reg::T0, im: 0 },
+                AUIPC { d: T0, im: 0 },
                 (sym, RelocKind::Call),
             );
-            self.emit_jalr(Reg::RA, Reg::T0, 0)
+            self.emit_jalr(RA, T0, 0)
         }
     }
 
@@ -1389,9 +1412,8 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             im: i32
         ) -> u64 {
-            let bytes = rv32::encode_li_rv32_little(Reg::A0, im);
-            self.emit_bytes_at(section, bytes);
-            self.emit_ret()
+            self.emit_li32_at(section, A0, im);
+            self.emit_ret_at(section)
         }
     }
 
@@ -1403,8 +1425,7 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             im: i64
         ) -> u64 {
-            let bytes = rv64::encode_li_rv64_little(Reg::A0, im);
-            self.emit_bytes_at(section, bytes);
+            self.emit_li64_at(section, A0, im);
             self.emit_ret()
         }
     }
@@ -1437,7 +1458,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::LB { d: rd, s: rs1, im: offset })
+            self.emit_bytes_at(section, LB { d: rd, s: rs1, im: offset })
         }
     }
 
@@ -1452,7 +1473,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::LH { d: rd, s: rs1, im: offset })
+            self.emit_bytes_at(section, LH { d: rd, s: rs1, im: offset })
         }
     }
 
@@ -1467,7 +1488,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::LW { d: rd, s: rs1, im: offset })
+            self.emit_bytes_at(section, LW { d: rd, s: rs1, im: offset })
         }
     }
 
@@ -1482,7 +1503,10 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, rv64::encode_ld(rd, rs1, offset))
+            self.emit_bytes_at(
+                section,
+                LD { d: rd, s: rs1, im: offset }
+            )
         }
     }
 
@@ -1497,7 +1521,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::SB { s1: rs1, s2: rs2, im: offset })
+            self.emit_bytes_at(section, SB { s1: rs1, s2: rs2, im: offset })
         }
     }
 
@@ -1512,7 +1536,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::SH { s1: rs1, s2: rs2, im: offset })
+            self.emit_bytes_at(section, SH { s1: rs1, s2: rs2, im: offset })
         }
     }
 
@@ -1527,7 +1551,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::SW { s1: rs1, s2: rs2, im: offset })
+            self.emit_bytes_at(section, SW { s1: rs1, s2: rs2, im: offset })
         }
     }
 
@@ -1542,7 +1566,10 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, rv64::encode_sd(rs1, rs2, offset))
+            self.emit_bytes_at(
+                section,
+                SD { s1: rs1, s2: rs2, im: offset }
+            )
         }
     }
 
@@ -1559,7 +1586,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::ADD { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, ADD { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1574,7 +1601,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::SUB { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, SUB { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1589,7 +1616,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::ADDI { d: rd, s: rs1, im })
+            self.emit_bytes_at(section, ADDI { d: rd, s: rs1, im })
         }
     }
 
@@ -1603,7 +1630,7 @@ impl<'a> Assembler<'a> {
             rd: Reg,
             im: i32
         ) -> u64 {
-            let bytes = rv32::encode_li_rv32_little(rd, im);
+            let bytes = pseudo::encode_li32_little(rd, im);
             self.emit_bytes_at(section, bytes)
         }
     }
@@ -1618,7 +1645,7 @@ impl<'a> Assembler<'a> {
             rd: Reg,
             im: i64
         ) -> u64 {
-            let bytes = rv64::encode_li_rv64_little(rd, im);
+            let bytes = pseudo::encode_li64_little(rd, im);
             self.emit_bytes_at(section, bytes)
         }
     }
@@ -1666,7 +1693,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::AND { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, AND { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1680,7 +1707,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::OR { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, OR { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1694,7 +1721,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::XOR { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, XOR { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1708,7 +1735,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::ANDI { d: rd, s: rs1, im })
+            self.emit_bytes_at(section, ANDI { d: rd, s: rs1, im })
         }
     }
 
@@ -1722,7 +1749,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::ORI { d: rd, s: rs1, im })
+            self.emit_bytes_at(section, ORI { d: rd, s: rs1, im })
         }
     }
 
@@ -1736,7 +1763,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::XORI { d: rd, s: rs1, im })
+            self.emit_bytes_at(section, XORI { d: rd, s: rs1, im })
         }
     }
 
@@ -1752,7 +1779,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::SLL { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, SLL { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1766,7 +1793,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::SRL { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, SRL { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1780,7 +1807,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::SRA { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, SRA { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1794,7 +1821,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             shamt: i8
         ) -> u64 {
-            self.emit_bytes_at(section, I::SLLI { d: rd, s: rs1, im: shamt })
+            self.emit_bytes_at(section, SLLI { d: rd, s: rs1, im: shamt })
         }
     }
 
@@ -1808,7 +1835,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             shamt: i8
         ) -> u64 {
-            self.emit_bytes_at(section, I::SRLI { d: rd, s: rs1, im: shamt })
+            self.emit_bytes_at(section, SRLI { d: rd, s: rs1, im: shamt })
         }
     }
 
@@ -1822,7 +1849,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             shamt: i8
         ) -> u64 {
-            self.emit_bytes_at(section, I::SRAI { d: rd, s: rs1, im: shamt })
+            self.emit_bytes_at(section, SRAI { d: rd, s: rs1, im: shamt })
         }
     }
 
@@ -1838,7 +1865,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::SLT { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, SLT { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1852,7 +1879,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             rs2: Reg
         ) -> u64 {
-            self.emit_bytes_at(section, I::SLTU { d: rd, s1: rs1, s2: rs2 })
+            self.emit_bytes_at(section, SLTU { d: rd, s1: rs1, s2: rs2 })
         }
     }
 
@@ -1866,7 +1893,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             im: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::SLTI { d: rd, s: rs1, im })
+            self.emit_bytes_at(section, SLTI { d: rd, s: rs1, im })
         }
     }
 
@@ -1882,7 +1909,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::BEQ { s1: rs1, s2: rs2, im: 0 })
+            self.emit_branch_to_at(section, label, BEQ { s1: rs1, s2: rs2, im: 0 })
         }
     }
 
@@ -1896,7 +1923,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::BNE { s1: rs1, s2: rs2, im: 0 })
+            self.emit_branch_to_at(section, label, BNE { s1: rs1, s2: rs2, im: 0 })
         }
     }
 
@@ -1910,7 +1937,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::BLT { s1: rs1, s2: rs2, im: 0 })
+            self.emit_branch_to_at(section, label, BLT { s1: rs1, s2: rs2, im: 0 })
         }
     }
 
@@ -1924,7 +1951,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::BGE { s1: rs1, s2: rs2, im: 0 })
+            self.emit_branch_to_at(section, label, BGE { s1: rs1, s2: rs2, im: 0 })
         }
     }
 
@@ -1938,7 +1965,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::BLTU { s1: rs1, s2: rs2, im: 0 })
+            self.emit_branch_to_at(section, label, BLTU { s1: rs1, s2: rs2, im: 0 })
         }
     }
 
@@ -1952,7 +1979,7 @@ impl<'a> Assembler<'a> {
             rs2: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::BGEU { s1: rs1, s2: rs2, im: 0 })
+            self.emit_branch_to_at(section, label, BGEU { s1: rs1, s2: rs2, im: 0 })
         }
     }
 
@@ -1967,7 +1994,7 @@ impl<'a> Assembler<'a> {
             rd: Reg,
             label: LabelId
         ) -> u64 {
-            self.emit_branch_to_at(section, label, I::JAL { d: rd, im: 0 })
+            self.emit_branch_to_at(section, label, JAL { d: rd, im: 0 })
         }
     }
 
@@ -1981,7 +2008,7 @@ impl<'a> Assembler<'a> {
             rs1: Reg,
             offset: i16
         ) -> u64 {
-            self.emit_bytes_at(section, I::JALR { d: rd, s: rs1, im: offset })
+            self.emit_bytes_at(section, JALR { d: rd, s: rs1, im: offset })
         }
     }
 
@@ -1998,7 +2025,7 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             lbl_id: LabelId
         ) -> u64 {
-            self.emit_jal_at(section, Reg::ZERO, lbl_id)
+            self.emit_jal_at(section, ZERO, lbl_id)
         }
     }
 
@@ -2010,7 +2037,7 @@ impl<'a> Assembler<'a> {
             &mut self,
             section: SectionId
         ) -> u64 {
-            self.emit_jalr_at(section, Reg::ZERO, Reg::RA, 0)
+            self.emit_jalr_at(section, ZERO, RA, 0)
         }
     }
 
@@ -2022,7 +2049,7 @@ impl<'a> Assembler<'a> {
             &mut self,
             section: SectionId
         ) -> u64 {
-            self.emit_addi_at(section, Reg::ZERO, Reg::ZERO, 0)
+            self.emit_addi_at(section, ZERO, ZERO, 0)
         }
     }
 
@@ -2036,8 +2063,8 @@ impl<'a> Assembler<'a> {
             reg: Reg
         ) -> u64 {
             let ptr_size = self.address_bytes() as i16;
-            self.emit_addi_at(section, Reg::SP, Reg::SP, -ptr_size);
-            self.emit_sd_at(section, Reg::SP, reg, 0)
+            self.emit_addi_at(section, SP, SP, -ptr_size);
+            self.emit_sd_at(section, SP, reg, 0)
         }
     }
 
@@ -2051,8 +2078,8 @@ impl<'a> Assembler<'a> {
             reg: Reg
         ) -> u64 {
             let ptr_size = self.address_bytes() as i16;
-            self.emit_ld_at(section, reg, Reg::SP, 0);
-            self.emit_addi_at(section, Reg::SP, Reg::SP, ptr_size)
+            self.emit_ld_at(section, reg, SP, 0);
+            self.emit_addi_at(section, SP, SP, ptr_size)
         }
     }
 }

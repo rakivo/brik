@@ -22,9 +22,8 @@ pub(crate) extern crate alloc as std;
 pub mod util;
 
 pub mod asm;
-pub mod rv32;
-pub mod rv64;
-pub mod opcode;
 pub mod misc_enc;
 
 pub use object;
+pub use brik_rv32 as rv32;
+pub use brik_rv64 as rv64;
