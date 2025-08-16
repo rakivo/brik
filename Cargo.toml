@@ -6,8 +6,8 @@ authors = ["Mark Tyrkba <marktyrkba456@gmail.com>"]
 rust-version = "1.68.2"
 
 [dependencies]
-brik_rv32  = { version = "0.2.1",   default-features = false }
-brik_rv64  = { version = "0.1.0",   default-features = false }
+brik_rv32  = { version = "0.2.2",   default-features = false }
+brik_rv64  = { version = "0.1.1",   default-features = false }
 smallvec   = { version = "1.15.1",  default-features = false }
 thiserror  = { version = "2.0",     default-features = false }
 bytecount  = { version = "0.6.9",   default-features = false }
@@ -20,7 +20,7 @@ object     = { version = "~0.37.3", default-features = false, features = ["write
 miette     = { version = "7.6.0",   default-features = false, features = ["fancy"], optional = true }
 
 [features]
-default = []
+default = ["std"]
 # default = ["std", "fancy-diagnostics"]
 
 fancy-diagnostics = ["miette/fancy", "std"]

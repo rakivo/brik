@@ -447,7 +447,7 @@ impl<'a> Assembler<'a> {
             d: Reg,
             funct3: u32,
             s: Reg,
-            im: i8,
+            im: u8,
             funct7: u32
         ) -> u64 {
             self.emit_bytes_at(section, I32::i7(opcode, d, funct3, s, im, funct7))
@@ -1831,9 +1831,9 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             rd: Reg,
             rs1: Reg,
-            shamt: i8
+            shamt: u8
         ) -> u64 {
-            self.emit_bytes_at(section, SLLI { d: rd, s: rs1, im: shamt })
+            self.emit_bytes_at(section, SLLI { d: rd, s: rs1, shamt })
         }
     }
 
@@ -1845,9 +1845,9 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             rd: Reg,
             rs1: Reg,
-            shamt: i8
+            shamt: u8
         ) -> u64 {
-            self.emit_bytes_at(section, SRLI { d: rd, s: rs1, im: shamt })
+            self.emit_bytes_at(section, SRLI { d: rd, s: rs1, shamt })
         }
     }
 
@@ -1859,9 +1859,9 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             rd: Reg,
             rs1: Reg,
-            shamt: i8
+            shamt: u8
         ) -> u64 {
-            self.emit_bytes_at(section, SRAI { d: rd, s: rs1, im: shamt })
+            self.emit_bytes_at(section, SRAI { d: rd, s: rs1, shamt })
         }
     }
 
