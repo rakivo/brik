@@ -141,7 +141,7 @@ pub fn decode_li32_little(bytes: &[u8], rd: Reg) -> i32 {
         match I32::try_from_u32(inst_word) {
             Ok(inst32) => match inst32 {
                 LUI { d, im } if d == rd => {
-                    imm = ((im as u32 & 0x000FFFFF) as u32) << 12
+                    imm = (im as u32 & 0x000FFFFF) << 12
                 }
                 ADDI { d, s, im } if d == rd && s == rd => {
                     imm = imm.wrapping_add(im as i32 as u32)

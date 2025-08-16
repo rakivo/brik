@@ -157,14 +157,14 @@ pub fn encode_li32_little(rd: Reg, imm: i32) -> RV64Inst {
     let mut bytes = RV64Inst::new();
 
     // -------------- case 1: fits into 12 bits
-    if misc::int_fits_into_12_bits(imm as i64) {
+    if misc::int_fits_into_12_bits(imm) {
         let inst = ADDI { d: rd, s: ZERO, im: imm as i16 };
         bytes.extend_from_slice(&inst.into_bytes());
         return bytes;
     }
 
     // -------------- case 1: doesn't fit into 12 bits
-    let mut hi = (imm >> 12) as i32;
+    let mut hi = imm >> 12;
     let mut lo = imm - (hi << 12);
 
     // adjust to ensure lo is in -2048 to 2047
@@ -181,7 +181,7 @@ pub fn encode_li32_little(rd: Reg, imm: i32) -> RV64Inst {
 
     if lo != 0 {
         debug_assert!{
-            lo >= -2048 && lo <= 2047,
+            misc::int_fits_into_12_bits(lo),
             "lower 12 bits of `li` rv32 little-endian don't fit into 12 bits: {lo}"
         };
         let lo_inst = ADDI { d: rd, s: rd, im: lo as i16 };
