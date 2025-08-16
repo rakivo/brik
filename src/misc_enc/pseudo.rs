@@ -3,12 +3,17 @@ use crate::rv32::I32::*;
 use crate::rv32::Reg::{self, *};
 use crate::util::into_bytes::IntoBytes;
 
+use std::vec::Vec;
+
 use core::mem;
 
 use smallvec::SmallVec;
 
-pub type RV32Inst = SmallVec<[u8; mem::size_of::<u32>() * 2]>;
-pub type RV64Inst = SmallVec<[u8; mem::size_of::<u32>() * 6]>;
+pub const MAX_I32_SIZE: usize = mem::size_of::<u32>() * 2;
+pub const MAX_I64_SIZE: usize = mem::size_of::<u32>() * 6;
+
+pub type RV32Inst = SmallVec<[u8; MAX_I32_SIZE]>;
+pub type RV64Inst = SmallVec<[u8; MAX_I64_SIZE]>;
 
 /// Expand `li rd, imm` for RV64 and return its encoding as little-endian bytes.
 ///
@@ -41,7 +46,7 @@ pub type RV64Inst = SmallVec<[u8; mem::size_of::<u32>() * 6]>;
 /// assert_eq!(decode_li64_little(&bytes, A3), imm64);
 /// ```
 pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
-    let mut bytes = RV64Inst::new();
+    let mut bytes = RV64Inst::with_capacity(MAX_I64_SIZE);
 
     // -------------- case 1: fits into 12 bits
     if misc::int_fits_into_12_bits(imm) {
@@ -73,7 +78,7 @@ pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
 
     // -------------- case 3: does not fit into 32 bits
     let remaining = imm as u64;
-    let mut shifts = std::vec::Vec::new();
+    let mut shifts = Vec::with_capacity(6);
 
     // (shamt, 11-bit chunk)
     for shift in (0..64).step_by(11).rev() {
@@ -83,12 +88,7 @@ pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
         }
     }
 
-    if shifts.is_empty() {
-        // imm == 0
-        let inst = ADDI { d: rd, s: ZERO, im: 0 };
-        bytes.extend_from_slice(&inst.into_bytes());
-        return bytes
-    }
+    debug_assert!(!shifts.is_empty());
 
     // emit first chunk using addi from x0 or lui if high chunk
     let (first_shift, first_ck) = shifts[0];
@@ -153,14 +153,14 @@ pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
 /// let bytes = encode_li32_little(A2, imm32);
 /// assert_eq!(decode_li32_little(&bytes, A2), imm32);
 /// // ```
-pub fn encode_li32_little(rd: Reg, imm: i32) -> RV64Inst {
-    let mut bytes = RV64Inst::new();
+pub fn encode_li32_little(rd: Reg, imm: i32) -> RV32Inst {
+    let mut bytes = RV32Inst::with_capacity(MAX_I32_SIZE);
 
     // -------------- case 1: fits into 12 bits
     if misc::int_fits_into_12_bits(imm) {
         let inst = ADDI { d: rd, s: ZERO, im: imm as i16 };
         bytes.extend_from_slice(&inst.into_bytes());
-        return bytes;
+        return bytes
     }
 
     // -------------- case 1: doesn't fit into 12 bits
