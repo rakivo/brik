@@ -44,8 +44,8 @@ fn produce_custom_obj<'a>() -> Object<'a> {
         "rv64gc"
     );
 
-    asm.custom_emit_function_prologue = debug_prologue;
-    asm.custom_emit_function_epilogue = debug_epilogue;
+    asm.set_custom_emit_function_epilogue(debug_epilogue);
+    asm.set_custom_emit_function_prologue(debug_prologue);
 
     asm.set_object_flags(FileFlags::Elf {
         os_abi: 0,
