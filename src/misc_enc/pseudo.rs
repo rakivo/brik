@@ -10,9 +10,6 @@ use smallvec::SmallVec;
 pub type RV32Inst = SmallVec<[u8; mem::size_of::<u32>() * 2]>;
 pub type RV64Inst = SmallVec<[u8; mem::size_of::<u32>() * 6]>;
 
-// TODO(#24): Make encode_li64_little support full range of 64-bit immediates
-// TODO(#25): Make encode_li32_little support full range of 32-bit immediates
-
 /// Expand `li rd, imm` for RV64 and return its encoding as little-endian bytes.
 ///
 /// # Example
@@ -33,39 +30,102 @@ pub type RV64Inst = SmallVec<[u8; mem::size_of::<u32>() * 6]>;
 /// let bytes = encode_li64_little(A1, imm64);
 /// assert_eq!(decode_li64_little(&bytes, A1), imm64);
 ///
-/// // skip for now
-/// // // large 64-bit imm
-/// // let imm64: i64 = 0x1234_5678_9ABC_DEF0;
-/// // let bytes = encode_li64_little(A2, imm64);
-/// // assert_eq!(decode_li64_little(&bytes, A2), imm64);
+/// // large 64-bit imm
+/// let imm64: i64 = 0x1234_5678_9ABC_DEF0;
+/// let bytes = encode_li64_little(A2, imm64);
+/// assert_eq!(decode_li64_little(&bytes, A2), imm64);
 ///
-/// // // negative 64-bit imm
-/// // let imm64: i64 = -0x1234_5678_9ABC_DEF0;
-/// // let bytes = encode_li64_little(A3, imm64);
-/// // assert_eq!(decode_li64_little(&bytes, A3), imm64);
+/// // negative 64-bit imm
+/// let imm64: i64 = -0x1234_5678_9ABC_DEF0;
+/// let bytes = encode_li64_little(A3, imm64);
+/// assert_eq!(decode_li64_little(&bytes, A3), imm64);
 /// ```
 pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
     let mut bytes = RV64Inst::new();
 
-    if misc::fits_into_12_bits(imm) {
+    // -------------- case 1: fits into 12 bits
+    if misc::int_fits_into_12_bits(imm) {
         let inst = ADDI { d: rd, s: ZERO, im: imm as i16 };
         bytes.extend_from_slice(&inst.into_bytes());
         return bytes
     }
 
-    let upper12 = ((imm + 0x800) >> 12) as i32;
-    let hi_inst = LUI { d: rd, im: upper12 };
-    bytes.extend_from_slice(&hi_inst.into_bytes());
+    // -------------- case 2: fits into 32 bits
+    if misc::int_fits_into_32_bits(imm) {
+        let hi = ((imm + 0x800) >> 12) as i32;
+        let lo = imm - ((hi as i64) << 12);
 
-    let lower12 = imm - ((upper12 as i64) << 12);
-    if lower12 != 0 {
-        debug_assert!{
-            misc::fits_into_12_bits(lower12),
-            "lower12 bits of `li` rv64 little-endian don't fit into 12 bits: {lower12}"
-        };
+        let hi_inst = LUI { d: rd, im: hi };
+        bytes.extend_from_slice(&hi_inst.into_bytes());
 
-        let lo_inst = ADDI { d: rd, s: rd, im: lower12 as i16 };
-        bytes.extend_from_slice(&lo_inst.into_bytes());
+        if lo != 0 {
+            debug_assert!{
+                misc::int_fits_into_12_bits(lo),
+                "lower12 bits of `li` rv64 little-endian don't fit into 12 bits: {lo}"
+            };
+
+            let lo_inst = ADDI { d: rd, s: rd, im: lo as i16 };
+            bytes.extend_from_slice(&lo_inst.into_bytes());
+        }
+
+        return bytes
+    }
+
+    // -------------- case 3: does not fit into 32 bits
+    let remaining = imm as u64;
+    let mut shifts = std::vec::Vec::new();
+
+    // (shamt, 11-bit chunk)
+    for shift in (0..64).step_by(11).rev() {
+        let ck = ((remaining >> shift) & 0x7FF) as i16;
+        if ck != 0 {
+            shifts.push((shift, ck));
+        }
+    }
+
+    if shifts.is_empty() {
+        // imm == 0
+        let inst = ADDI { d: rd, s: ZERO, im: 0 };
+        bytes.extend_from_slice(&inst.into_bytes());
+        return bytes
+    }
+
+    // emit first chunk using addi from x0 or lui if high chunk
+    let (first_shift, first_ck) = shifts[0];
+    if first_shift >= 12 {
+        let rounding_add = (1u64 << (first_shift - 12)) >> 1;
+        let hi20 = (((first_ck as u64) + rounding_add) >> (first_shift - 12)) as i32;
+        let remainder = first_ck - (((hi20 as u64) << (first_shift - 12)) as i16);
+
+        let hi_inst = LUI { d: rd, im: hi20 };
+        bytes.extend_from_slice(&hi_inst.into_bytes());
+
+        if remainder != 0 {
+            debug_assert!{
+                misc::int_fits_into_12_bits(remainder as i64),
+                "remainder of `li` rv64 little-endian don't fit into 12 bits: {remainder}"
+            };
+
+            let lo_inst = ADDI { d: rd, s: rd, im: remainder as _ };
+            bytes.extend_from_slice(&lo_inst.into_bytes());
+        }
+    } else {
+        let inst = ADDI { d: rd, s: Reg::ZERO, im: first_ck as _ };
+        bytes.extend_from_slice(&inst.into_bytes());
+    }
+
+    // emit remaining chunks
+    let mut prev_shift = first_shift;
+    for &(shift, ck) in &shifts[1..] {
+        let dshift = prev_shift - shift;
+        if dshift > 0 {
+            let inst = SLLI { d: rd, s: rd, shamt: dshift as _ };
+            bytes.extend_from_slice(&inst.into_bytes());
+        }
+
+        let inst = ORI { d: rd, s: rd, im: ck as _ };
+        bytes.extend_from_slice(&inst.into_bytes());
+        prev_shift = shift;
     }
 
     bytes
@@ -81,40 +141,50 @@ pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
 /// // small imm
 /// let imm32: i32 = 42;
 /// let bytes = encode_li32_little(A0, imm32);
-/// assert_eq!(decode_li32_little(&bytes, A0), imm32 as i64);
+/// assert_eq!(decode_li32_little(&bytes, A0), imm32);
 ///
-/// // skip for now
-/// // // large 32-bit imm
-/// // let imm32 = i32::MAX;
-/// // let bytes = encode_li32_little(A1, imm32);
-/// // assert_eq!(decode_li32_little(&bytes, A1), imm32 as i64);
+/// // large 32-bit imm
+/// let imm32 = i32::MAX;
+/// let bytes = encode_li32_little(A1, imm32);
+/// assert_eq!(decode_li32_little(&bytes, A1), imm32);
 ///
-/// // // negative 32-bit imm
-/// // let imm32 = i32::MIN;
-/// // let bytes = encode_li32_little(A2, imm32);
-/// // assert_eq!(decode_li32_little(&bytes, A2), imm32 as i64);
+/// // negative 32-bit imm
+/// let imm32 = i32::MIN;
+/// let bytes = encode_li32_little(A2, imm32);
+/// assert_eq!(decode_li32_little(&bytes, A2), imm32);
 /// // ```
-pub fn encode_li32_little(rd: Reg, imm: i32) -> RV32Inst {
-    let mut bytes = RV32Inst::new();
+pub fn encode_li32_little(rd: Reg, imm: i32) -> RV64Inst {
+    let mut bytes = RV64Inst::new();
 
-    if misc::fits_into_12_bits(imm) {
+    // -------------- case 1: fits into 12 bits
+    if misc::int_fits_into_12_bits(imm as i64) {
         let inst = ADDI { d: rd, s: ZERO, im: imm as i16 };
         bytes.extend_from_slice(&inst.into_bytes());
-        return bytes
+        return bytes;
     }
 
-    let upper12 = (imm + 0x800) >> 12;
-    let hi_inst = LUI { d: rd, im: upper12 };
+    // -------------- case 1: doesn't fit into 12 bits
+    let mut hi = (imm >> 12) as i32;
+    let mut lo = imm - (hi << 12);
+
+    // adjust to ensure lo is in -2048 to 2047
+    if lo > 2047 {
+        hi += 1;
+        lo -= 0x1000;
+    } else if lo < -2048 {
+        hi -= 1;
+        lo += 0x1000;
+    }
+
+    let hi_inst = LUI { d: rd, im: hi };
     bytes.extend_from_slice(&hi_inst.into_bytes());
 
-    let lower12 = imm - (upper12 << 12);
-    if lower12 != 0 {
+    if lo != 0 {
         debug_assert!{
-            misc::fits_into_12_bits(lower12),
-            "lower12 bits of `li` rv32 little-endian don't fit into 12 bits: {lower12}"
+            lo >= -2048 && lo <= 2047,
+            "lower 12 bits of `li` rv32 little-endian don't fit into 12 bits: {lo}"
         };
-
-        let lo_inst = ADDI { d: rd, s: rd, im: lower12 as i16 };
+        let lo_inst = ADDI { d: rd, s: rd, im: lo as i16 };
         bytes.extend_from_slice(&lo_inst.into_bytes());
     }
 
