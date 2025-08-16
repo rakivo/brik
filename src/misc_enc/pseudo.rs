@@ -83,7 +83,7 @@ pub fn encode_li64_little(rd: Reg, imm: i64) -> RV64Inst {
 /// let bytes = encode_li32_little(A0, imm32);
 /// assert_eq!(decode_li32_little(&bytes, A0), imm32 as i64);
 ///
-/// skip for now
+/// // skip for now
 /// // // large 32-bit imm
 /// // let imm32 = i32::MAX;
 /// // let bytes = encode_li32_little(A1, imm32);

@@ -516,6 +516,7 @@ impl<'a> Assembler<'a> {
     with_no_at! {
         emit_amo,
         #[inline(always)]
+        #[allow(clippy::too_many_arguments)]
         pub fn emit_amo_at(
             &mut self,
             section: SectionId,

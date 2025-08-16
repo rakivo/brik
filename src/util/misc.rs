@@ -172,6 +172,17 @@ macro_rules! debug_from_display {
     };
 }
 
+macro_rules! assembler_doclink {
+    ($name: ident) => {
+        concat!{
+            "For details, see: [`",
+            "crate::asm::Assembler::",
+            stringify!($name),
+            "`]"
+        }
+    };
+}
+
 // TODO(#20): Make `with_at_end!` support for generics and `where` clauses
 macro_rules! with_at_end {
     (
@@ -191,7 +202,10 @@ macro_rules! with_at_end {
 
         // TODO(#21): Stop using paste in macros as it is bad for lsp jumping
         paste::paste! {
+            $(#[$meta])*
             #[inline(always)]
+            #[allow(unused_attributes)]
+            #[doc = assembler_doclink!($name)]
             $vis fn [<$name _at_end>]
             $(<$($generics),*>)?
             (&mut $self $(, $param_name: $param_type)*)
@@ -211,7 +225,7 @@ macro_rules! with_no_at {
     (
         $no_at_name: ident,
         $(#[$meta:meta])*
-        pub fn $name_at:ident
+        $vis:vis fn $name_at:ident
         $(<$($generics:tt),*>)?
         (
             &mut $self:ident,
@@ -219,7 +233,7 @@ macro_rules! with_no_at {
         ) $(-> $ret:ty)? $body:block
     ) => {
         $(#[$meta])*
-        pub fn $name_at
+        $vis fn $name_at
         $(<$($generics),*>)?
         (
             &mut $self, $section: $section_type $(, $arg: $ty)*
@@ -231,7 +245,8 @@ macro_rules! with_no_at {
         #[track_caller]
         #[inline(always)]
         #[allow(unused_attributes)]
-        pub fn $no_at_name
+        #[doc = assembler_doclink!($name_at)]
+        $vis fn $no_at_name
         $(<$($generics),*>)?
         (&mut $self $(, $arg: $ty)*)
         $(-> $ret)?
@@ -265,6 +280,7 @@ macro_rules! with_no_at {
         #[track_caller]
         #[inline(always)]
         #[allow(unused_attributes)]
+        #[doc = assembler_doclink!($name_at)]
         pub fn $no_at_name
         $(<$($generics),*>)?
         (&mut $self $(, $arg: $ty)*)
