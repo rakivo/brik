@@ -1,7 +1,4 @@
 // TODO(#1): Implement tests
-// TODO(#26): API to create global labels
-// TODO(#29): Update API to accept `addend` where appropriate
-// TODO(#28): Expose label adding API
 // TODO(#27): Generate `new_symbol_*` functions
 // TODO(#22): Support variable word-sizes
 // TODO(#13): Support for `GOT` and `TLS` relocations

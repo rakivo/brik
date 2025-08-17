@@ -22,7 +22,7 @@ fn debug_prologue(asm: &mut Assembler, section: SectionId) -> u64 {
     let printf_sym = asm.symbol_id(b"printf").unwrap();
 
     asm.emit_default_function_prologue_at(section);
-    asm.emit_pcrel_load_addr(Reg::A0, fmt_sym);
+    asm.emit_pcrel_load_addr(Reg::A0, fmt_sym, 0);
     asm.emit_call_plt(printf_sym)
 }
 
@@ -31,7 +31,7 @@ fn debug_epilogue(asm: &mut Assembler, section: SectionId) -> u64 {
     let fmt_sym = asm.symbol_id(b"epilogue_msg").unwrap();
     let printf_sym = asm.symbol_id(b"printf").unwrap();
 
-    asm.emit_pcrel_load_addr(Reg::A0, fmt_sym);
+    asm.emit_pcrel_load_addr(Reg::A0, fmt_sym, 0);
     asm.emit_call_plt(printf_sym);
     asm.emit_default_function_epilogue_at(section)
 }
@@ -68,7 +68,7 @@ fn produce_custom_obj<'a>() -> Object<'a> {
     let _text = asm.add_text_section_at_end();
 
     asm.emit_function_prologue();
-    asm.emit_pcrel_load_addr(Reg::A0, inside_msg);
+    asm.emit_pcrel_load_addr(Reg::A0, inside_msg, 0);
     asm.emit_call_plt(printf_sym);
     asm.emit_function_epilogue();
     asm.emit_return_imm(0);

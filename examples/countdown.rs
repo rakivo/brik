@@ -47,13 +47,17 @@ fn produce_countdown_obj<'a>() -> Object<'a> {
     asm.emit_function_prologue();
 
     // s1 = count
-    asm.emit_pcrel_load_addr(S1, countdown_sym);
+    asm.emit_pcrel_load_addr(S1, countdown_sym, 0);
     asm.emit_ld(S1, S1, 0);
 
-    let loop_lbl = asm.add_label_here(b".loop");
+    let loop_lbl = asm.add_label_here(
+        b".loop",
+        SymbolKind::Text,
+        SymbolScope::Compilation
+    );
 
     // a0 = msg
-    asm.emit_pcrel_load_addr(A0, msg_sym);
+    asm.emit_pcrel_load_addr(A0, msg_sym, 0);
 
     asm.emit_call_plt(printf_sym);
 

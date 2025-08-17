@@ -61,11 +61,11 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.emit_addi(SP, SP, -8);
 
     // print input prompt
-    asm.emit_pcrel_load_addr(A0, input_fmt_sym);
+    asm.emit_pcrel_load_addr(A0, input_fmt_sym, 0);
     asm.emit_call_plt(printf_sym);
 
     // read input number
-    asm.emit_pcrel_load_addr(A0, scanf_fmt_sym);
+    asm.emit_pcrel_load_addr(A0, scanf_fmt_sym, 0);
     asm.emit_addi(A1, SP, 0);
     asm.emit_call_plt(scanf_sym);
 
@@ -78,8 +78,17 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     // init counter in s3 (i = 1)
     asm.emit_addi(S3, ZERO, 1);
 
-    let loop_lbl = asm.add_label_here(b".fact_loop");
-    let done_lbl = asm.declare_label(b".fact_done");
+    let loop_lbl = asm.add_label_here(
+        b".fact_loop",
+        SymbolKind::Text,
+        SymbolScope::Compilation
+    );
+
+    let done_lbl = asm.declare_label(
+        b".fact_done",
+        SymbolKind::Text,
+        SymbolScope::Compilation
+    );
 
     // loop condition: if i > n, exit
     asm.emit_branch_to(
@@ -103,7 +112,7 @@ fn produce_factorial_obj<'a>() -> Object<'a> {
     asm.place_label_here(done_lbl);
 
     // print result
-    asm.emit_pcrel_load_addr(A0, result_fmt_sym);
+    asm.emit_pcrel_load_addr(A0, result_fmt_sym, 0);
     asm.emit_mv(A1, S2); // move result to a1
     asm.emit_addi(A1, S2, 0);
     asm.emit_call_plt(printf_sym);

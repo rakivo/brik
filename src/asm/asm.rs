@@ -774,24 +774,12 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    fn add_label_(&mut self, name: impl AsRef<[u8]>, offset: u64) -> Label {
-        let sym = self.add_symbol(
-            name,
-            offset,
-            0,
-            SymbolKind::Text,
-            SymbolScope::Compilation,
-            false,
-            SymbolFlags::None
-        );
-
-        Label { sym }
-    }
-
-    #[inline]
-    pub fn add_label_here(&mut self, name: impl AsRef<[u8]>) -> LabelId {
-        let curr_offset = self.curr_offset();
-        let l = self.add_label_(&name, curr_offset);
+    pub fn add_label(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        sym: SymbolId
+    ) -> LabelId {
+        let l = Label { sym };
         let id = self.next_brik_lbl_id();
         self.name_to_label.insert(name.as_ref().to_owned(), id);
         self.labels.insert(id, l);
@@ -799,12 +787,46 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
+    fn add_label_(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        offset: u64,
+        kind: SymbolKind,
+        scope: SymbolScope
+    ) -> LabelId {
+        let sym = self.add_symbol(
+            &name,
+            offset,
+            0,
+            kind,
+            scope,
+            false,
+            SymbolFlags::None
+        );
+
+        self.add_label(name, sym)
+    }
+
+    #[inline]
+    pub fn add_label_here(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope
+    ) -> LabelId {
+        let curr_offset = self.curr_offset();
+        self.add_label_(name, curr_offset, kind, scope)
+    }
+
+    #[inline]
     #[track_caller]
-    pub fn declare_label(&mut self, name: impl AsRef<[u8]>) -> LabelId {
-        let l = self.add_label_(&name, 0);
-        let id = self.next_brik_lbl_id();
-        self.name_to_label.insert(name.as_ref().to_owned(), id);
-        self.labels.insert(id, l);
+    pub fn declare_label(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope
+    ) -> LabelId {
+        let id = self.add_label_(name, 0, kind, scope);
 
         self.unplaced_labels.insert(id, UnplacedLabelInfo {
             caller_loc: panic::Location::caller()
@@ -1268,7 +1290,7 @@ impl<'a> Assembler<'a> {
             &mut self,
             section: SectionId,
             data: impl IntoBytes<'a>,
-            reloc_info: (SymbolId, RelocKind),
+            reloc_info: (SymbolId, i64, RelocKind),
         ) -> u64 {
             let offset = self.obj.append_section_data(
                 section,
@@ -1276,13 +1298,13 @@ impl<'a> Assembler<'a> {
                 1 // align
             );
 
-            let (symbol, rtype) = reloc_info;
+            let (symbol, addend, rtype) = reloc_info;
 
             self.add_reloc(section, Reloc {
                 offset,
                 symbol,
                 rtype,
-                addend: 0
+                addend
             });
 
             offset
@@ -1353,17 +1375,18 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             rd: Reg,
             target_sym: SymbolId,
+            addend: i64
         ) -> u64 {
             let hi_offset = self.emit_bytes_with_reloc_at(
                 section,
                 AUIPC { d: rd, im: 0 },
-                (target_sym, RelocKind::PcrelHi20),
+                (target_sym, addend, RelocKind::PcrelHi20),
             );
             let label = self.create_pcrel_hi_label_at(section, hi_offset);
             self.emit_bytes_with_reloc_at(
                 section,
                 ADDI { d: rd, s: rd, im: 0 },
-                (label, RelocKind::PcrelLo12I),
+                (label, addend, RelocKind::PcrelLo12I),
             )
         }
     }
@@ -1379,7 +1402,7 @@ impl<'a> Assembler<'a> {
             self.emit_bytes_with_reloc_at(
                 section,
                 AUIPC { d: T0, im: 0 },
-                (target_sym, RelocKind::CallPlt),
+                (target_sym, 0, RelocKind::CallPlt),
             );
             self.emit_jalr(RA, T0, 0)
         }
@@ -1396,7 +1419,7 @@ impl<'a> Assembler<'a> {
             self.emit_bytes_with_reloc_at(
                 section,
                 AUIPC { d: T0, im: 0 },
-                (sym, RelocKind::Call),
+                (sym, 0, RelocKind::Call),
             );
             self.emit_jalr(RA, T0, 0)
         }

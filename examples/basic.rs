@@ -45,7 +45,7 @@ fn produce_add_34_35_obj<'a>() -> Object<'a> {
     asm.emit_function_prologue();
 
     // a0 = fmt
-    asm.emit_pcrel_load_addr(A0, fmt_sym);
+    asm.emit_pcrel_load_addr(A0, fmt_sym, 0);
 
     // a1 = 34
     asm.emit_li(A1, 34);
