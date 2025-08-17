@@ -3,7 +3,6 @@
 use crate::rv32::Reg;
 use crate::rv64::I64::{self, *};
 
-use core::fmt;
 use core::ops::{Shl, Neg};
 
 use num_traits::{Num, Bounded, FromBytes, PrimInt};
@@ -77,11 +76,10 @@ pub fn decode_li64_little(bytes: &[u8], rd: Reg) -> i64 {
     while offset < bytes.len() {
         let inst_word = lint(&bytes[offset..offset + 4]);
 
-        // Try to decode as 32-bit instruction first
         match I32::try_from_u32(inst_word) {
             Ok(inst32) => match inst32 {
                 LUI { d, im } if d == rd => {
-                    imm = ((im as u32 & 0x000FFFFF) as u64) << 12; // Mask to 20 bits, treat as unsigned
+                    imm = ((im as u32 & 0x000FFFFF) as u64) << 12;
                 }
                 ADDI { d, s, im } if d == rd && s == rd => {
                     imm = imm.wrapping_add(im as i64 as u64);
@@ -93,27 +91,24 @@ pub fn decode_li64_little(bytes: &[u8], rd: Reg) -> i64 {
                     imm <<= shamt ;
                 }
                 ORI { d, s, im } if d == rd && s == rd => {
-                    imm |= (im as u32 & 0x00000FFF) as u64; // Ensure 12-bit unsigned
+                    imm |= (im as u32 & 0x00000FFF) as u64;
                 }
                 _ => panic!("Unexpected instruction: {inst32:?}"),
             }
 
-            Err(e) => {
-                println!("I32::try_from_u32 returned error: {e:?}, trying I64::try_from_u32..");
-                match I64::try_from_u32(inst_word) {
-                    Ok(inst64) => match inst64 {
-                        SLLIW { d, s, shamt } if d == rd && s == rd => {
-                            imm <<= shamt;
-                        }
-                        SRLIW { d, s, shamt } if d == rd && s == rd => {
-                            imm >>= shamt;
-                        }
-                        _ => panic!("Unexpected instruction: {inst64:?}"),
+            Err(_) => match I64::try_from_u32(inst_word) {
+                Ok(inst64) => match inst64 {
+                    SLLIW { d, s, shamt } if d == rd && s == rd => {
+                        imm <<= shamt;
                     }
+                    SRLIW { d, s, shamt } if d == rd && s == rd => {
+                        imm >>= shamt;
+                    }
+                    _ => panic!("Unexpected instruction: {inst64:?}"),
+                }
 
-                    Err(e) => panic!{
-                        "Cannot decode instruction word: 0x{:08x} at offest: {offset}: {e:?}", inst_word
-                    }
+                Err(e) => panic!{
+                    "Cannot decode instruction word: 0x{inst_word:08x} at offest: {offset}: {e:?}"
                 }
             }
         }
@@ -152,7 +147,9 @@ pub fn decode_li32_little(bytes: &[u8], rd: Reg) -> i32 {
                 _ => panic!("Unexpected instruction: {inst32:?}"),
             }
 
-            Err(e) => panic!("couldn't decode inst_word: 0x{inst_word:X}: {e:?}")
+            Err(e) => panic!{
+                "Cannot decode instruction word: 0x{inst_word:08x} at offest: {offset}: {e:?}"
+            }
         }
 
         offset += 4;
@@ -168,9 +165,10 @@ pub fn le_bytes_into_int<T>(bytes: &[u8]) -> T
 where
     T: PrimInt + FromBytes,
     <T as FromBytes>::Bytes: Sized + for<'a> TryFrom<&'a [u8]>,
-    for<'a> <<T as FromBytes>::Bytes as TryFrom<&'a [u8]>>::Error: fmt::Debug,
 {
-    let array: <T as FromBytes>::Bytes = bytes.try_into().expect("wrong length");
+    let Ok(array) = bytes.try_into() else {
+        panic!("wrong length")
+    };
     T::from_le_bytes(&array)
 }
 
@@ -181,9 +179,10 @@ pub fn be_bytes_into_int<T>(bytes: &[u8]) -> T
 where
     T: PrimInt + FromBytes,
     <T as FromBytes>::Bytes: Sized + for<'a> TryFrom<&'a [u8]>,
-    for<'a> <<T as FromBytes>::Bytes as TryFrom<&'a [u8]>>::Error: fmt::Debug,
 {
-    let array: <T as FromBytes>::Bytes = bytes.try_into().expect("wrong length");
+    let Ok(array) = bytes.try_into() else {
+        panic!("wrong length")
+    };
     T::from_be_bytes(&array)
 }
 

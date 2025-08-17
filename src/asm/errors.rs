@@ -1,9 +1,12 @@
 use crate::asm::Assembler;
+use crate::util::diag::{
+    BrikNamedSource,
+    BrikSourceSpan
+};
 #[cfg(feature = "std")]
 use crate::util::diag::{
     self,
     DiagnosticRenderer,
-    UnplacedLabelDiagnostic
 };
 
 use std::str;
@@ -13,9 +16,42 @@ use std::borrow::ToOwned;
 
 use core::{fmt, mem, panic};
 
+#[cfg(feature = "fancy-diagnostics")]
+use miette::Diagnostic;
+
 #[derive(Debug)]
 pub(crate) struct UnplacedLabelInfo {
     pub(crate) caller_loc: &'static panic::Location<'static>
+}
+
+/// Diagnostic struct for rendering errors of unplaced labels.
+#[derive(Debug)]
+#[cfg_attr(feature = "fancy-diagnostics", derive(Diagnostic))]
+pub struct UnplacedLabelDiagnostic {
+    /// The name of the unplaced label.
+    pub name: String,
+
+    /// The span where the label was referenced.
+    #[cfg_attr(feature = "fancy-diagnostics", label("label never placed"))]
+    pub span: BrikSourceSpan,
+
+    /// The source file content.
+    #[cfg_attr(feature = "fancy-diagnostics", source_code)]
+    pub src: BrikNamedSource,
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for UnplacedLabelDiagnostic {}
+
+impl fmt::Display for UnplacedLabelDiagnostic {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!{
+            f,
+            "unplaced label '{name}'",
+            name = self.name
+        }
+    }
 }
 
 /// The FinishError stores the pre-rendered, pretty error text.
@@ -40,7 +76,6 @@ impl FinishError {
         use std::{fs, sync::Arc};
 
         #[cfg(feature = "std")]
-        #[allow(clippy::default_constructed_unit_structs)]
         let renderer = DiagnosticRenderer::default();
 
         #[cfg(feature = "std")]

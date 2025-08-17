@@ -1,13 +1,13 @@
 //! Diagnostic helpers
 
 use crate::util::misc;
+#[cfg(not(feature = "fancy-diagnostics"))]
+use crate::asm::errors::UnplacedLabelDiagnostic;
 
-use std::format;
 use std::sync::Arc;
 use std::string::String;
 
 use memchr::Memchr;
-use thiserror::Error;
 
 #[cfg(feature = "fancy-diagnostics")]
 use miette::{
@@ -83,26 +83,9 @@ impl SourceCode for BrikNamedSource {
     }
 }
 
-/// Diagnostic struct for rendering errors of unplaced labels.
-#[derive(Debug, Error)]
-#[error("unplaced label '{name}'")]
-#[cfg_attr(feature = "fancy-diagnostics", derive(Diagnostic))]
-pub struct UnplacedLabelDiagnostic {
-    /// The name of the unplaced label.
-    pub name: String,
-
-    /// The span where the label was referenced.
-    #[cfg_attr(feature = "fancy-diagnostics", label("label never placed"))]
-    pub span: BrikSourceSpan,
-
-    /// The source file content.
-    #[cfg_attr(feature = "fancy-diagnostics", source_code)]
-    pub src: BrikNamedSource,
-}
-
 #[derive(Default)]
 #[cfg(not(feature = "fancy-diagnostics"))]
-pub struct DiagnosticRenderer;
+pub struct DiagnosticRenderer {}
 
 #[cfg(feature = "fancy-diagnostics")]
 pub struct DiagnosticRenderer {
@@ -167,7 +150,7 @@ impl DiagnosticRenderer {
         let line_number_str = line_number.to_string();
         let line_number_pad = " ".repeat(line_number_str.len());
 
-        format!{
+        std::format!{
             "error: unplaced label '{name}'\n  --> {src_name}:{lnum}:{c}\n{lpad} |\n{lstr} | {line}\n{lpad} | {caret}\n",
             name = diag.name,
             lnum = line_number,
