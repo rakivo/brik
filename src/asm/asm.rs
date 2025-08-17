@@ -90,7 +90,7 @@ fn default_emit_function_epilogue(
 /// Object file builder
 #[derive(Debug)]
 pub struct Assembler<'a> {
-    obj: Object<'a>,
+    pub obj: Object<'a>,
 
     arch: Arch,
 
@@ -1122,6 +1122,14 @@ impl<'a> Assembler<'a> {
             false, // strong
             SymbolFlags::None
         )
+    }
+
+    #[inline(always)]
+    pub fn add_symbol_raw(
+        &mut self,
+        symbol: Symbol
+    ) -> SymbolId {
+        self.obj.add_symbol(symbol)
     }
 
     with_no_at!{
