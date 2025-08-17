@@ -1,4 +1,5 @@
 // TODO(#1): Implement tests
+// TODO(#30): API to get current label
 // TODO(#27): Generate `new_symbol_*` functions
 // TODO(#22): Support variable word-sizes
 // TODO(#13): Support for `GOT` and `TLS` relocations
