@@ -104,6 +104,7 @@ pub struct Assembler<'a> {
     format: BinaryFormat,
 
     labels: FxHashMap<LabelId, Label>,
+    name_to_label: FxHashMap<Vec<u8>, LabelId>,
     pub(crate) unplaced_labels: FxHashMap<LabelId, UnplacedLabelInfo>,
 
     custom_emit_function_prologue: CompatFnWrapper<EmitFunctionPrologue>,
@@ -158,6 +159,7 @@ impl<'a> Assembler<'a> {
             lbl_id_counter: LabelId(0),
 
             labels: FxHashMap::default(),
+            name_to_label: FxHashMap::default(),
             unplaced_labels: FxHashMap::default(),
 
             obj: Object::new(
@@ -789,8 +791,9 @@ impl<'a> Assembler<'a> {
     #[inline]
     pub fn add_label_here(&mut self, name: impl AsRef<[u8]>) -> LabelId {
         let curr_offset = self.curr_offset();
-        let l = self.add_label_(name, curr_offset);
+        let l = self.add_label_(&name, curr_offset);
         let id = self.next_brik_lbl_id();
+        self.name_to_label.insert(name.as_ref().to_owned(), id);
         self.labels.insert(id, l);
         id
     }
@@ -798,8 +801,9 @@ impl<'a> Assembler<'a> {
     #[inline]
     #[track_caller]
     pub fn declare_label(&mut self, name: impl AsRef<[u8]>) -> LabelId {
-        let l = self.add_label_(name, 0);
+        let l = self.add_label_(&name, 0);
         let id = self.next_brik_lbl_id();
+        self.name_to_label.insert(name.as_ref().to_owned(), id);
         self.labels.insert(id, l);
 
         self.unplaced_labels.insert(id, UnplacedLabelInfo {
@@ -1028,6 +1032,12 @@ impl<'a> Assembler<'a> {
     #[inline(always)]
     pub fn get_label(&self, lbl_id: LabelId) -> &Label {
         &self.labels[&lbl_id]
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn get_label_id(&self, name: impl AsRef<[u8]>) -> Option<LabelId> {
+        self.name_to_label.get(name.as_ref()).copied()
     }
 
     #[must_use]
