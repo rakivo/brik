@@ -809,9 +809,18 @@ impl<'a> Assembler<'a> {
         id
     }
 
+    #[inline(always)]
+    pub fn add_reloc(
+        &mut self,
+        section: SectionId,
+        reloc: Reloc,
+    ) {
+        self.relocs.push((section, reloc))
+    }
+
     #[inline]
     #[track_caller]
-    pub fn add_reloc(
+    pub fn add_reloc_raw(
         &mut self,
         section: SectionId,
         reloc: Reloc,
@@ -840,7 +849,7 @@ impl<'a> Assembler<'a> {
     pub fn resolve_final_relocs(&mut self) {
         let relocs = mem::take(&mut self.relocs);
         for (section_id, reloc) in relocs {
-            self.add_reloc(section_id, reloc);
+            self.add_reloc_raw(section_id, reloc);
         }
     }
 
