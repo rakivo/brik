@@ -197,7 +197,7 @@ impl<'a> Assembler<'a> {
     #[inline]
     pub fn finish(mut self) -> Result<Object<'a>, FinishError> {
         if self.unplaced_labels.is_empty() {
-            self.resolve_local_relocs();
+            // self.resolve_local_relocs();
             self.resolve_final_relocs();
             return Ok(self.obj)
         }
