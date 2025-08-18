@@ -96,7 +96,8 @@ pub struct Assembler<'a> {
 
     relocs: Vec<(SectionId, Reloc)>,
 
-    curr_section: Option<SectionId>,
+    curr_section : Option<SectionId>,
+    curr_label   : Option<LabelId>,
 
     pcrel_counter: u32,
     lbl_id_counter: LabelId,
@@ -149,10 +150,10 @@ impl<'a> Assembler<'a> {
         isa: &str
     ) -> Self {
         let mut asm = Self {
+            arch,
             format,
 
-            arch,
-
+            curr_label: None,
             curr_section: None,
 
             pcrel_counter: 0,
@@ -224,6 +225,25 @@ impl<'a> Assembler<'a> {
     #[inline(always)]
     pub fn set_custom_emit_function_epilogue(&mut self, f: EmitFunctionEpilogue) {
         self.custom_emit_function_epilogue = CompatFnWrapper(f)
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn get_curr_label(&self) -> Option<LabelId> {
+        self.curr_label
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn set_curr_label(&mut self, l: LabelId) -> Option<LabelId> {
+        self.curr_label.replace(l)
+    }
+
+    #[must_use]
+    #[track_caller]
+    #[inline(always)]
+    pub fn expect_curr_label(&self) -> LabelId {
+        self.get_curr_label().expect("no current section set")
     }
 
     #[inline(always)]
@@ -774,19 +794,6 @@ impl<'a> Assembler<'a> {
     }
 
     #[inline]
-    pub fn add_label(
-        &mut self,
-        name: impl AsRef<[u8]>,
-        sym: SymbolId
-    ) -> LabelId {
-        let l = Label { sym };
-        let id = self.next_brik_lbl_id();
-        self.name_to_label.insert(name.as_ref().to_owned(), id);
-        self.labels.insert(id, l);
-        id
-    }
-
-    #[inline]
     fn add_label_(
         &mut self,
         name: impl AsRef<[u8]>,
@@ -805,6 +812,20 @@ impl<'a> Assembler<'a> {
         );
 
         self.add_label(name, sym)
+    }
+
+    #[inline]
+    pub fn add_label(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        sym: SymbolId
+    ) -> LabelId {
+        let l = Label { sym };
+        let id = self.next_brik_lbl_id();
+        self.name_to_label.insert(name.as_ref().to_owned(), id);
+        self.labels.insert(id, l);
+        _ = self.set_curr_label(id);
+        id
     }
 
     #[inline]
