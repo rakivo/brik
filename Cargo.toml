@@ -8,7 +8,7 @@ rust-version = "1.68.2"
 [dependencies]
 brik_rv32  = { version = "0.2.2",   default-features = false }
 # brik_rv32  = { path = "../brik_rv32/",   default-features = false }
-brik_rv64  = { version = "0.1.2",   default-features = false }
+brik_rv64  = { version = "0.1.3",   default-features = false }
 # brik_rv64  = { path = "../brik_rv64/",   default-features = false }
 smallvec   = { version = "1.15.1",  default-features = false }
 bytecount  = { version = "0.6.9",   default-features = false }
