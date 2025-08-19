@@ -295,7 +295,7 @@ impl<'a> Assembler<'a> {
         &mut self,
         name: impl AsRef<[u8]>,
         f: impl FnOnce(&mut Symbol) -> R
-    ) -> R {
+    ) -> (R, SymbolId) {
         let sym_id = self.symbol_id(name.as_ref()).unwrap_or_else(|| {
             self.add_symbol_extern(
                 name,
@@ -304,7 +304,7 @@ impl<'a> Assembler<'a> {
             )
         });
 
-        self.edit_sym(sym_id, f)
+        (self.edit_sym(sym_id, f), sym_id)
     }
 
     #[inline]
@@ -367,7 +367,7 @@ impl<'a> Assembler<'a> {
         &mut self,
         name: impl AsRef<[u8]>,
         f: impl FnOnce(&mut Symbol) -> R,
-    ) -> R {
+    ) -> (R, LabelId) {
         let lbl_id = self.get_or_insert_label(
             name,
             SymbolKind::Text,
@@ -378,7 +378,8 @@ impl<'a> Assembler<'a> {
 
         let sym_id = self.get_label(lbl_id).sym;
         let sym = self.symbol_mut(sym_id);
-        f(sym)
+
+        (f(sym), lbl_id)
     }
 
     #[inline(always)]
