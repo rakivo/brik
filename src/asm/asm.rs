@@ -273,6 +273,148 @@ impl<'a> Assembler<'a> {
         self.section_size(sid)
     }
 
+    // ----- MISC HELPERS -----
+
+    #[inline(always)]
+    pub fn make_sym_global(&mut self, sym_id: SymbolId) {
+        self.edit_sym(sym_id, |s| s.scope = SymbolScope::Dynamic)
+    }
+
+    #[inline(always)]
+    pub fn edit_sym<R>(
+        &mut self,
+        sym_id: SymbolId,
+        f: impl FnOnce(&mut Symbol) -> R
+    ) -> R {
+        let sym = self.symbol_mut(sym_id);
+        f(sym)
+    }
+
+    #[inline]
+    pub fn edit_or_add_sym_and_edit_it<R>(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        f: impl FnOnce(&mut Symbol) -> R
+    ) -> R {
+        let sym_id = self.symbol_id(name.as_ref()).unwrap_or_else(|| {
+            self.add_symbol_extern(
+                name,
+                SymbolKind::Text,
+                SymbolScope::Dynamic
+            )
+        });
+
+        self.edit_sym(sym_id, f)
+    }
+
+    #[inline]
+    fn get_or_insert_label(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope,
+        on_label: impl FnOnce(&mut Self, LabelId) -> LabelId,
+        on_missing: impl FnOnce(&mut Self, &[u8], SymbolKind, SymbolScope) -> LabelId,
+    ) -> LabelId {
+        let name_ref = name.as_ref();
+
+        if let Some(lbl_id) = self.get_label_id(name_ref) {
+            on_label(self, lbl_id)
+        } else if let Some(sym_id) = self.symbol_id(name_ref) {
+            let s = self.symbol_mut(sym_id);
+            s.kind  = kind;
+            s.scope = scope;
+            self.add_label(name_ref, sym_id)
+        } else {
+            on_missing(self, name_ref, kind, scope)
+        }
+    }
+
+    #[inline]
+    pub fn place_or_add_label_here(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope,
+    ) -> LabelId {
+        self.get_or_insert_label(
+            name,
+            kind,
+            scope,
+            |this, lbl_id| { this.place_label_here(lbl_id); lbl_id },
+            |this, name_ref, kind, scope| this.add_label_here(name_ref, kind, scope),
+        )
+    }
+
+    #[inline]
+    pub fn get_or_declare_label(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        kind: SymbolKind,
+        scope: SymbolScope,
+    ) -> LabelId {
+        self.get_or_insert_label(
+            name,
+            kind,
+            scope,
+            |_this, lbl_id| lbl_id,
+            |this, name_ref, kind, scope| this.declare_label(name_ref, kind, scope),
+        )
+    }
+
+    #[inline]
+    pub fn edit_or_add_label_sym_and_edit_it<R>(
+        &mut self,
+        name: impl AsRef<[u8]>,
+        f: impl FnOnce(&mut Symbol) -> R,
+    ) -> R {
+        let lbl_id = self.get_or_insert_label(
+            name,
+            SymbolKind::Text,
+            SymbolScope::Dynamic,
+            |_, lbl_id| lbl_id,
+            |this, name, kind, scope| this.declare_label(name, kind, scope),
+        );
+
+        let sym_id = self.get_label(lbl_id).sym;
+        let sym = self.symbol_mut(sym_id);
+        f(sym)
+    }
+
+    #[inline(always)]
+    pub fn edit_label_sym<R>(
+        &mut self,
+        lbl_id: LabelId,
+        f: impl FnOnce(&mut Symbol) -> R
+    ) -> R {
+        let sym_id = self.get_label(lbl_id).sym;
+        self.edit_sym(sym_id, f)
+    }
+
+    #[inline(always)]
+    pub fn edit_curr_label_sym<R>(
+        &mut self,
+        f: impl FnOnce(&mut Symbol) -> R
+    ) -> R {
+        let lbl_id = self.expect_curr_label();
+        self.edit_label_sym(lbl_id, f)
+    }
+
+    #[inline(always)]
+    pub fn make_label_global(&mut self, lbl_id: LabelId) {
+        let sym_id = self.get_label(lbl_id).sym;
+        self.make_sym_global(sym_id);
+    }
+
+    #[inline(always)]
+    pub fn make_curr_label_global(&mut self) {
+        let Some(lbl_id) = self.get_curr_label() else {
+            return
+        };
+
+        self.make_label_global(lbl_id);
+    }
+
     // ----- DATA/PADDING EMISSION HELPERS -----
 
     with_no_at! {
