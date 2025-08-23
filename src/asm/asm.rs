@@ -98,8 +98,10 @@ pub struct Assembler<'a> {
     curr_section : Option<SectionId>,
     curr_label   : Option<LabelId>,
 
-    pcrel_counter: u32,
     lbl_id_counter: LabelId,
+
+    pcrel_counter: u32,
+    pcrel_labels_buf: String,
 
     format: BinaryFormat,
 
@@ -155,8 +157,10 @@ impl<'a> Assembler<'a> {
             curr_label: None,
             curr_section: None,
 
-            pcrel_counter: 0,
             lbl_id_counter: LabelId(0),
+
+            pcrel_counter: 0,
+            pcrel_labels_buf: String::with_capacity(32),
 
             labels: FxHashMap::default(),
             name_to_label: FxHashMap::default(),
@@ -909,7 +913,7 @@ impl<'a> Assembler<'a> {
     // --------------------------
 
     #[inline]
-    pub fn next_pcrel_label(&mut self, part: PcrelPart) -> String {
+    fn next_pcrel_label(&mut self, part: PcrelPart) -> &str {
         let suffix = match part {
             PcrelPart::Hi20  => "hi20",
             PcrelPart::Lo12I => "lo12i",
@@ -919,22 +923,21 @@ impl<'a> Assembler<'a> {
         let counter = self.pcrel_counter;
         self.pcrel_counter += 1;
 
-        let mut s = String::with_capacity(16);
-
-        s.push_str(".Lpcrel_");
-        s.push_str(suffix);
+        self.pcrel_labels_buf.clear();
+        self.pcrel_labels_buf.push_str(".Lpcrel_");
+        self.pcrel_labels_buf.push_str(suffix);
 
         #[cfg(feature = "use_itoa")] {
             let mut itoa = itoa::Buffer::new();
-            s.push_str(itoa.format(counter));
+            self.pcrel_labels_buf.push_str(itoa.format(counter));
         }
 
         #[cfg(not(feature = "use_itoa"))] {
-            use std::string::ToString;
-            s.push_str(&counter.to_string());
+            use core::fmt::Write;
+            write!(self.pcrel_labels_buf, "{counter}").unwrap();
         }
 
-        s
+        &self.pcrel_labels_buf
     }
 
     #[must_use]
@@ -1492,10 +1495,17 @@ impl<'a> Assembler<'a> {
             section: SectionId,
             offset: u64,
         ) -> SymbolId {
-            let name = self.next_pcrel_label(PcrelPart::Hi20);
+            let name = unsafe {
+                // SAFETY: Temporarily bypass borrow checker.
+                // next_pcrel_label only reads/writes pcrel_counter counter/buf fields.
+                // add_symbol_at doesn't touch pcrel counter/buf.
+                let self_ptr: *mut Self = self;
+                (&mut *self_ptr).next_pcrel_label(PcrelPart::Hi20)
+            };
+
             self.add_symbol_at(
                 SymbolSection::Section(section),
-                name.as_bytes(),
+                name,
                 offset,
                 0,
                 SymbolKind::Label,
