@@ -42,7 +42,6 @@ use crate::object::write::{
 
 use std::str;
 use std::vec;
-use std::format;
 use std::vec::Vec;
 use std::string::String;
 use std::borrow::ToOwned;
@@ -910,22 +909,32 @@ impl<'a> Assembler<'a> {
     // --------------------------
 
     #[inline]
-    pub fn next_pcrel_label(
-        &mut self,
-        part: PcrelPart
-    ) -> String {
-        let l = format!{
-            ".Lpcrel_{p}{lbl}",
-            p = match part {
-                PcrelPart::Hi20  => "hi20",
-                PcrelPart::Lo12I => "lo12i",
-                PcrelPart::Lo12S => "lo12s",
-            },
-            lbl = self.pcrel_counter
+    pub fn next_pcrel_label(&mut self, part: PcrelPart) -> String {
+        let suffix = match part {
+            PcrelPart::Hi20  => "hi20",
+            PcrelPart::Lo12I => "lo12i",
+            PcrelPart::Lo12S => "lo12s",
         };
 
+        let counter = self.pcrel_counter;
         self.pcrel_counter += 1;
-        l
+
+        let mut s = String::with_capacity(16);
+
+        s.push_str(".Lpcrel_");
+        s.push_str(suffix);
+
+        #[cfg(feature = "use_itoa")] {
+            let mut itoa = itoa::Buffer::new();
+            s.push_str(itoa.format(counter));
+        }
+
+        #[cfg(not(feature = "use_itoa"))] {
+            use std::string::ToString;
+            s.push_str(&counter.to_string());
+        }
+
+        s
     }
 
     #[must_use]
